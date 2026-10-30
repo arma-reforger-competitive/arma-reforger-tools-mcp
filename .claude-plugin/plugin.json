@@ -1,0 +1,18 @@
+{
+  "name": "reforger",
+  "version": "0.1.0",
+  "description": "Arma Reforger modding tools and know-how for Claude.",
+  "author": {
+    "name": "Volosiuk Yevhenii"
+  },
+  "repository": "https://github.com/arma-reforger-competitive/arma-reforger-tools-mcp",
+  "license": "MIT",
+  "mcpServers": {
+    "reforger": {
+      "command": "node",
+      "args": [
+        "${CLAUDE_PLUGIN_ROOT}/src/main.ts"
+      ]
+    }
+  }
+}

@@ -1,0 +1,14 @@
+{
+  "name": "reforger-local",
+  "description": "Local install of the reforger plugin from this repo",
+  "owner": {
+    "name": "Volosiuk Yevhenii"
+  },
+  "plugins": [
+    {
+      "name": "reforger",
+      "source": "./",
+      "description": "Arma Reforger modding help for Claude"
+    }
+  ]
+}
