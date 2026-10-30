@@ -3,14 +3,11 @@
   "version": "0.1.0",
   "private": true,
   "description": "Claude Code plugin for Arma Reforger modding",
-  "type": "module",
   "license": "MIT",
-  "engines": {
-    "node": ">=24"
-  },
+  "type": "module",
   "scripts": {
-    "build": "tsc",
-    "test": "vitest run"
+    "check": "vp check",
+    "test": "vp test run"
   },
   "dependencies": {
     "@modelcontextprotocol/server": "^2.4.0",
@@ -19,7 +16,13 @@
   "devDependencies": {
     "@modelcontextprotocol/client": "^2.4.0",
     "@types/node": "^24.19.2",
-    "typescript": "^7.0.2",
-    "vitest": "^5.0.5"
+    "vite": "npm:@voidzero-dev/vite-plus-core@1.4.0",
+    "vite-plus": "1.4.0"
+  },
+  "overrides": {
+    "vite": "npm:@voidzero-dev/vite-plus-core@1.4.0"
+  },
+  "engines": {
+    "node": ">=24"
   }
 }
