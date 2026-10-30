@@ -15,6 +15,10 @@ A Port is done when all four checks pass:
 3. One real question in Claude Code uses the tools and gets a correct answer.
 4. `docs/build-log.md` has a 3-5 line entry: what was ported, what changed from the old code, and why.
 
+## Commits
+
+Commit messages follow Conventional Commits with this project's types and scopes. Read `docs/agents/commits.md` before every commit.
+
 ## Agent skills
 
 ### Issue tracker
