@@ -32,9 +32,11 @@ Claude Code runs the plugin from this folder, so keep the folder after the insta
 ## Development
 
 ```sh
-npm run build   # check the types
+npm run check   # check the format, find code problems, and check the types
 npm test        # run all tests
 ```
+
+Both commands use [Vite+](https://viteplus.dev) (`vp`). To fix the format, run `npx vp check --fix`.
 
 The server runs the TypeScript files in `src/` directly with Node, so there is no compile step. Each Capability has its own folder in `src/`.
 
