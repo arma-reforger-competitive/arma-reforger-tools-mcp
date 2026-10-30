@@ -20,18 +20,18 @@ feat(game-files): suggest the closest real paths when a path is wrong
 
 ## Types
 
-| Type       | Use when                                                     | Bump  |
-| ---------- | ------------------------------------------------------------ | ----- |
-| `feat`     | A new tool, skill, or Capability that users can see           | MINOR |
-| `fix`      | A bug that users could hit                                    | PATCH |
-| `docs`     | README, `GLOSSARY.md`, ADRs, `docs/`, code comments           | none  |
-| `refactor` | The code changes, the behaviour stays the same                | none  |
-| `perf`     | Faster or smaller, the behaviour stays the same               | none  |
-| `test`     | Tests only                                                    | none  |
-| `build`    | `package.json`, `tsconfig`, build scripts, plugin packaging   | none  |
-| `ci`       | Workflows in `.github/`                                       | none  |
-| `chore`    | Anything else, for example `.gitignore`                       | none  |
-| `revert`   | Undoing an earlier commit                                     | none  |
+| Type       | Use when                                                    | Bump  |
+| ---------- | ----------------------------------------------------------- | ----- |
+| `feat`     | A new tool, skill, or Capability that users can see         | MINOR |
+| `fix`      | A bug that users could hit                                  | PATCH |
+| `docs`     | README, `GLOSSARY.md`, ADRs, `docs/`, code comments         | none  |
+| `refactor` | The code changes, the behaviour stays the same              | none  |
+| `perf`     | Faster or smaller, the behaviour stays the same             | none  |
+| `test`     | Tests only                                                  | none  |
+| `build`    | `package.json`, `tsconfig`, build scripts, plugin packaging | none  |
+| `ci`       | Workflows in `.github/`                                     | none  |
+| `chore`    | Anything else, for example `.gitignore`                     | none  |
+| `revert`   | Undoing an earlier commit                                   | none  |
 
 - A plugin skill is behaviour that users get, so a new or changed skill is `feat` or `fix`, never `docs`.
 - Updating the Knowledge base after a game update is `fix`: users got outdated answers.

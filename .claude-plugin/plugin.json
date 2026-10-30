@@ -10,9 +10,7 @@
   "mcpServers": {
     "reforger": {
       "command": "node",
-      "args": [
-        "${CLAUDE_PLUGIN_ROOT}/src/main.ts"
-      ]
+      "args": ["${CLAUDE_PLUGIN_ROOT}/src/main.ts"]
     }
   }
 }

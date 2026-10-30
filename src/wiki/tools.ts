@@ -24,18 +24,27 @@ export function registerWikiTools(server: McpServer): void {
         "Read the full text of one Arma Reforger wiki page by its title. " +
         "If no page has that title, the answer lists the closest real titles.",
       inputSchema: z.object({
-        title: z.string().min(1).describe('Title of the wiki page, for example "Arma Reforger:Mod Project Setup"'),
+        title: z
+          .string()
+          .min(1)
+          .describe('Title of the wiki page, for example "Arma Reforger:Mod Project Setup"'),
       }),
     },
     async ({ title }) => {
       const page = findPage(title);
       if (!page) {
-        const suggestions = closestTitles(title, 3).map((suggestion) => `"${suggestion}"`).join(", ");
+        const suggestions = closestTitles(title, 3)
+          .map((suggestion) => `"${suggestion}"`)
+          .join(", ");
         const text = `No wiki page has the title "${title}". The closest titles are: ${suggestions}.`;
         return { content: [{ type: "text", text }], isError: true };
       }
-      const source = page.url ? `${SOURCE_NAMES[page.source]}, ${page.url}` : SOURCE_NAMES[page.source];
-      const text = [`## ${page.title}`, `Source: ${source}`, "", pageContent(page.content)].join("\n");
+      const source = page.url
+        ? `${SOURCE_NAMES[page.source]}, ${page.url}`
+        : SOURCE_NAMES[page.source];
+      const text = [`## ${page.title}`, `Source: ${source}`, "", pageContent(page.content)].join(
+        "\n",
+      );
       return { content: [{ type: "text", text }] };
     },
   );

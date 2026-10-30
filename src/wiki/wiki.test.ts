@@ -23,7 +23,9 @@ describe("wiki_read", () => {
 
     expect(page.isError).toBe(false);
     expect(page.text).toContain("## Arma Reforger:Mod Project Setup");
-    expect(page.text).toContain("https://community.bistudio.com/wiki/Arma_Reforger:Mod_Project_Setup");
+    expect(page.text).toContain(
+      "https://community.bistudio.com/wiki/Arma_Reforger:Mod_Project_Setup",
+    );
     expect(page.text).toContain("Workbench Launcher Setup");
   });
 
