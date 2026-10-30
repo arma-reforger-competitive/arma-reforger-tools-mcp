@@ -1,13 +1,22 @@
 import { readFileSync } from "node:fs";
+import * as z from "zod";
 
-export interface WikiPage {
-  title: string;
-  source: "bistudio-wiki" | "enfusion";
-  url?: string;
-  content: string;
-}
+// Every page from the BI Community Wiki has a URL. The Enfusion engine docs have none.
+const WikiPageSchema = z.discriminatedUnion("source", [
+  z.object({
+    source: z.literal("bistudio-wiki"),
+    title: z.string(),
+    url: z.string(),
+    content: z.string(),
+  }),
+  z.object({ source: z.literal("enfusion"), title: z.string(), content: z.string() }),
+]);
 
-const pages: WikiPage[] = JSON.parse(readFileSync(new URL("pages.json", import.meta.url), "utf8"));
+export type WikiPage = z.infer<typeof WikiPageSchema>;
+
+const pages = z
+  .array(WikiPageSchema)
+  .parse(JSON.parse(readFileSync(new URL("pages.json", import.meta.url), "utf8")));
 
 // Wiki URLs write spaces as underscores, so "Mod_Project_Setup" and "mod project setup" are the same title.
 function titleKey(title: string): string {

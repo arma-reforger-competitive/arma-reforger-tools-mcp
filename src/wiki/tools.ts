@@ -2,10 +2,18 @@ import type { McpServer } from "@modelcontextprotocol/server";
 import * as z from "zod";
 import { closestTitles, findPage, type WikiPage } from "./pages.ts";
 
-const SOURCE_NAMES: Record<WikiPage["source"], string> = {
-  "bistudio-wiki": "BI Community Wiki",
-  enfusion: "Enfusion engine docs",
-};
+function sourceLine(page: WikiPage): string {
+  switch (page.source) {
+    case "bistudio-wiki":
+      return `BI Community Wiki, ${page.url}`;
+    case "enfusion":
+      return "Enfusion engine docs";
+    default: {
+      const _exhaustive: never = page;
+      return _exhaustive;
+    }
+  }
+}
 
 // Claude Code cuts tool answers longer than about 25,000 tokens, which is about 100,000 characters.
 const MAX_CONTENT_LENGTH = 100_000;
@@ -39,12 +47,12 @@ export function registerWikiTools(server: McpServer): void {
         const text = `No wiki page has the title "${title}". The closest titles are: ${suggestions}.`;
         return { content: [{ type: "text", text }], isError: true };
       }
-      const source = page.url
-        ? `${SOURCE_NAMES[page.source]}, ${page.url}`
-        : SOURCE_NAMES[page.source];
-      const text = [`## ${page.title}`, `Source: ${source}`, "", pageContent(page.content)].join(
-        "\n",
-      );
+      const text = [
+        `## ${page.title}`,
+        `Source: ${sourceLine(page)}`,
+        "",
+        pageContent(page.content),
+      ].join("\n");
       return { content: [{ type: "text", text }] };
     },
   );
