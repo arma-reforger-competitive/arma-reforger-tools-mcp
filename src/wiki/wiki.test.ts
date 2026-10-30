@@ -13,8 +13,9 @@ beforeAll(async () => {
 
 async function readPage(title: string) {
   const result = await client.callTool({ name: "wiki_read", arguments: { title } });
-  const [first] = result.content as { type: string; text: string }[];
-  return { text: first!.text, isError: result.isError ?? false };
+  const [first] = result.content;
+  if (first?.type !== "text") throw new Error("wiki_read did not answer with text");
+  return { text: first.text, isError: result.isError ?? false };
 }
 
 describe("wiki_read", () => {
