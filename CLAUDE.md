@@ -18,17 +18,3 @@ A Port is done when all four checks pass:
 ## Commits
 
 Commit messages follow Conventional Commits with this project's types and scopes. Read `docs/agents/commits.md` before every commit.
-
-## Agent skills
-
-### Issue tracker
-
-Issues live as GitHub issues; use the `gh` CLI for all operations. See `docs/agents/issue-tracker.md`.
-
-### Triage labels
-
-Five canonical labels: `needs-triage`, `needs-info`, `ready-for-agent`, `ready-for-human`, `wontfix`. See `docs/agents/triage-labels.md`.
-
-### Domain docs
-
-Single-context: `GLOSSARY.md` + `docs/adr/` at the repo root. See `docs/agents/domain.md`.
