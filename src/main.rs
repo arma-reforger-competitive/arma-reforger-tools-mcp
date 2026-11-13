@@ -5,6 +5,9 @@
 mod server;
 mod wiki;
 
+#[cfg(test)]
+mod test_support;
+
 // endregion: --- Modules
 
 #[tokio::main(flavor = "current_thread")]

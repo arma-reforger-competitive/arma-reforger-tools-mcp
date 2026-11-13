@@ -107,14 +107,9 @@ fn with_commas(number: usize) -> String {
 
 #[cfg(test)]
 mod tests {
-    use rmcp::{
-        ServerHandler, ServiceExt,
-        handler::server::router::tool::ToolRouter,
-        model::{CallToolRequestParams, ClientConfig},
-        service::{RoleClient, RunningService},
-        tool_handler,
-    };
     use serde_json::json;
+
+    use crate::test_support::{self, Answer, TestClient};
 
     #[tokio::test]
     async fn returns_the_page_text_for_a_known_title() {
@@ -218,52 +213,12 @@ mod tests {
 
     // -- Test Support
 
-    #[derive(Clone)]
-    struct TestServer {
-        tools: ToolRouter<Self>,
+    async fn connect() -> TestClient {
+        test_support::connect(super::tools().unwrap()).await
     }
 
-    #[expect(
-        clippy::unused_async_trait_impl,
-        reason = "the rmcp tool_handler macro writes list_tools as async"
-    )]
-    #[tool_handler(router = self.tools)]
-    impl ServerHandler for TestServer {}
-
-    struct Answer {
-        text: String,
-        is_error: bool,
-    }
-
-    async fn connect() -> RunningService<RoleClient, ClientConfig> {
-        let (server_side, client_side) = tokio::io::duplex(1 << 20);
-        let server = TestServer {
-            tools: super::tools().unwrap(),
-        };
-        tokio::spawn(async move { server.serve(server_side).await.unwrap().waiting().await });
-        ClientConfig::default().serve(client_side).await.unwrap()
-    }
-
-    async fn read_page(client: &RunningService<RoleClient, ClientConfig>, title: &str) -> Answer {
-        let arguments = json!({ "title": title });
-        let result = client
-            .call_tool(
-                CallToolRequestParams::new("wiki_read")
-                    .with_arguments(arguments.as_object().unwrap().clone()),
-            )
-            .await
-            .unwrap();
-        let [content] = result.content.as_slice() else {
-            panic!("wiki_read did not answer with one content block");
-        };
-        Answer {
-            text: content
-                .as_text()
-                .expect("wiki_read did not answer with text")
-                .text
-                .clone(),
-            is_error: result.is_error.unwrap_or(false),
-        }
+    async fn read_page(client: &TestClient, title: &str) -> Answer {
+        test_support::call(client, "wiki_read", json!({ "title": title })).await
     }
 }
 
