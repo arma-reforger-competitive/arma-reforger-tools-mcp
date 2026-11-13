@@ -11,6 +11,7 @@ The `rmcp` API changes between versions. Copy from the working code here before 
 - A server with Tools: `src/server.rs`.
 - A Capability that gives its Tools, and a test with an in-memory client: `src/wiki/read.rs`.
 - A test that starts the real program over stdio: `tests/server.rs`.
+- An in-memory server and client for the tests of every Capability: `src/test_support.rs`.
 
 ## Errors
 
@@ -24,6 +25,6 @@ The `rmcp` API changes between versions. Copy from the working code here before 
 
 ## Tests
 
-- Test a Capability through its public `tools()` function: serve it on a test server, call the Tool with an MCP client, and check the text and `isError`. Example: the tests in `src/wiki/read.rs`.
+- Test a Capability through its public `tools()` function: serve it with `test_support::connect`, call the Tool with `test_support::call`, and check the text and `is_error`. Example: the tests in `src/wiki/read.rs`.
 - `tests/server.rs` starts the real program and calls one Tool from each Capability.
 - A Port keeps the expected answers of the old TypeScript tests. Take other expected values from the wiki text.
