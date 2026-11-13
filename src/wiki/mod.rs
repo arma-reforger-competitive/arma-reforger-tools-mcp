@@ -1,3 +1,5 @@
+#![doc = include_str!("README.md")]
+
 // region:    --- Modules
 
 mod pages;
