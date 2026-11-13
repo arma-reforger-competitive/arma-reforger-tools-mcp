@@ -4,7 +4,7 @@ Reads pages of the Arma Reforger wiki from the Knowledge base.
 
 ## Tools
 
-- `wiki_read`: returns the full text of one page by its title, for example `Arma Reforger:Mod Project Setup`. Capital letters do not matter, and underscores from a wiki URL count as spaces. If no page has the title, the answer lists the 3 closest real titles. Pages longer than 100,000 characters are cut.
+- `wiki_read`: returns the full text of one page by its title, for example `Arma Reforger:Mod Project Setup`. Capital letters do not matter, and underscores from a wiki URL count as spaces. If no page has the title, the answer lists the 3 closest real titles. An empty title gives an error with an example title. Pages longer than 100,000 characters are cut.
 
 ## Data
 

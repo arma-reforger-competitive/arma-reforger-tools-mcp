@@ -34,6 +34,15 @@ pub fn tools<S: Send + Sync + 'static>() -> Result<ToolRouter<S>, serde_json::Er
 }
 
 fn read(pages: &Pages, title: &str) -> CallToolResult {
+    // Underscores count as spaces in a title, so "_" alone is empty too.
+    if title
+        .trim_matches(|c: char| c == '_' || c.is_whitespace())
+        .is_empty()
+    {
+        let text = "The title is empty. Give the title of a wiki page, \
+                    for example \"Arma Reforger:Mod Project Setup\".";
+        return CallToolResult::error(vec![ContentBlock::text(text)]);
+    }
     let Some(page) = pages.find(title) else {
         let suggestions = pages
             .closest_titles(title, 3)
@@ -199,6 +208,21 @@ mod tests {
         assert!(!page.is_error);
         assert!(page.text.chars().count() < 100_500);
         assert!(page.text.contains("Cut at 100,000 of 164,192 characters."));
+    }
+
+    #[tokio::test]
+    async fn asks_for_a_title_when_the_title_is_empty() {
+        let client = connect().await;
+
+        for title in ["", " _ "] {
+            let page = read_page(&client, title).await;
+
+            assert!(page.is_error, "{title:?}");
+            assert_eq!(
+                page.text,
+                "The title is empty. Give the title of a wiki page, for example \"Arma Reforger:Mod Project Setup\"."
+            );
+        }
     }
 
     #[tokio::test]
