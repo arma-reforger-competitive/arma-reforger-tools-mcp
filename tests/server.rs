@@ -28,3 +28,37 @@ async fn starts_the_reforger_server_over_stdio_and_answers_wiki_read() {
 
     client.cancel().await.unwrap();
 }
+
+#[tokio::test]
+async fn describes_every_tool_and_every_tool_input() {
+    let server = TokioChildProcess::new(Command::new(env!("CARGO_BIN_EXE_reforger"))).unwrap();
+    let client = ClientConfig::default().serve(server).await.unwrap();
+
+    for tool in client.list_all_tools().await.unwrap() {
+        let description = tool.description.as_deref().unwrap_or_default();
+        assert!(
+            !description.trim().is_empty(),
+            "{} has no description",
+            tool.name
+        );
+        let inputs = tool
+            .input_schema
+            .get("properties")
+            .and_then(serde_json::Value::as_object)
+            .into_iter()
+            .flatten();
+        for (input, schema) in inputs {
+            let description = schema
+                .get("description")
+                .and_then(serde_json::Value::as_str)
+                .unwrap_or_default();
+            assert!(
+                !description.trim().is_empty(),
+                "{} has no description for the input {input}",
+                tool.name
+            );
+        }
+    }
+
+    client.cancel().await.unwrap();
+}
