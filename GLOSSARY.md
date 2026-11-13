@@ -85,8 +85,12 @@ A skill for agents that work on this repo. It does not ship in the Claude Code p
 _Avoid_: Know-how
 
 **Knowledge base**:
-The scraped Enfusion script API docs and wiki pages that ship with the Claude Code plugin.
+The Enfusion script API docs, wiki pages, and engine pages that ship with the Claude Code plugin.
 _Avoid_: KB, index, database
+
+**Section**:
+One heading in a page of the Knowledge base, with all the text and smaller headings under it, up to the next heading of the same or a higher level.
+_Avoid_: Chunk, part, paragraph
 
 **Game files**:
 The scripts, Prefabs, and configs inside the installed game's .pak archives.
