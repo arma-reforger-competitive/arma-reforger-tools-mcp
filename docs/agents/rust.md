@@ -1,6 +1,8 @@
 # Rust
 
-`cargo fmt` and `cargo clippy` check most rules. The lints are in `[lints]` in `Cargo.toml`. This file holds only the rules that no tool checks.
+This repo follows the shared Rust practices in `~/www/home/docs/agents/rust/`. Read its `README.md` first, then the topic files that your task needs. This file adds the rules for this repo. Where the two differ, this file wins.
+
+`cargo fmt` and `cargo clippy` check most rules. The lints are in `[lints]` in `Cargo.toml`.
 
 ## rmcp examples
 
@@ -12,8 +14,8 @@ The `rmcp` API changes between versions. Copy from the working code here before 
 
 ## Errors
 
-- Check data when the server starts, not on the first Tool call. Example: `wiki::tools()` parses `pages.json` and returns the error.
 - A wrong input from Claude is not a Rust error. Answer it as a Tool error with a hint (see `mcp.md`).
+- A failure inside a Tool, for example a missing file or a setting that is not set, is a case of the Capability's `Error` enum (shared `errors.md`). The Tool answers it with `CallToolResult::error`, and the error's `Display` text is the hint for Claude.
 - Use `#[expect]` only for code that a macro writes, and say which macro in the reason.
 
 ## Async
@@ -24,6 +26,4 @@ The `rmcp` API changes between versions. Copy from the working code here before 
 
 - Test a Capability through its public `tools()` function: serve it on a test server, call the Tool with an MCP client, and check the text and `isError`. Example: the tests in `src/wiki/mod.rs`.
 - `tests/server.rs` starts the real program and calls one Tool from each Capability.
-- Name a test by the behaviour it proves: `suggests_the_closest_real_titles_when_the_title_is_unknown`.
-- A Port keeps the expected answers of the old TypeScript tests.
-- Take expected values from the old answers or from the wiki text, never from the code under test.
+- A Port keeps the expected answers of the old TypeScript tests. Take other expected values from the wiki text.
