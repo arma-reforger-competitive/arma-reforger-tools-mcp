@@ -25,6 +25,12 @@ print_stderr = "warn"
 allow_attributes = "warn"
 allow_attributes_without_reason = "warn"
 
+[profile.dev]
+debug = "line-tables-only"
+
+[profile.dev.package."*"]
+debug = false
+
 [dependencies]
 rmcp = { version = "3.10.0", features = ["transport-io"] }
 schemars = "1.2.3"
