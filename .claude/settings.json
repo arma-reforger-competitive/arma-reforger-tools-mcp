@@ -1,0 +1,7 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npx -y @modelcontextprotocol/inspector@2.15.0 --cli target/release/reforger:*)"
+    ]
+  }
+}

@@ -11,17 +11,17 @@ This project rebuilds the older [enfusion-mcp](https://github.com/arma-reforger-
 
 ## Install
 
-You need [Node.js](https://nodejs.org/) 24 or later and Claude Code.
+You need Claude Code and Rust. Install Rust with [rustup](https://rustup.rs/). This repo's `rust-toolchain.toml` names the Rust version, and rustup installs it on the first `cargo` command.
 
 ```sh
 git clone https://github.com/arma-reforger-competitive/arma-reforger-tools-mcp.git
 cd arma-reforger-tools-mcp
-npm install
+cargo build --release
 claude plugin marketplace add ./
 claude plugin install reforger@reforger-local
 ```
 
-Claude Code runs the plugin from this folder, so keep the folder after the install. To check the install, run `claude mcp list`. The line `plugin:reforger:reforger` must show `Connected`.
+`cargo build --release` makes the server program `target/release/reforger`. Claude Code runs it from this folder, so keep the folder after the install. After a `git pull`, run `cargo build --release` again. To check the install, run `claude mcp list`. The line `plugin:reforger:reforger` must show `Connected`.
 
 ## Tools
 
@@ -32,13 +32,12 @@ Claude Code runs the plugin from this folder, so keep the folder after the insta
 ## Development
 
 ```sh
-npm run check   # check the format, find code problems, and check the types
-npm test        # run all tests
+cargo fmt                                    # fix the format
+cargo clippy --all-targets -- -D warnings    # find code problems
+cargo test                                   # run all tests
 ```
 
-Both commands use [Vite+](https://viteplus.dev) (`vp`). To fix the format, run `npx vp check --fix`.
-
-The server runs the TypeScript files in `src/` directly with Node, so there is no compile step. Each Capability has its own folder in `src/`.
+CI runs the same checks, with `cargo fmt --check`, on every push and pull request. Each Capability has its own folder in `src/`. The rules for Rust code are in [`docs/agents/rust.md`](docs/agents/rust.md), and the rules for Tools are in [`docs/agents/mcp.md`](docs/agents/mcp.md).
 
 ## Learn more
 

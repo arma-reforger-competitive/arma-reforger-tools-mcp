@@ -64,16 +64,28 @@ _Avoid_: Slotting screen, role select
 
 ## This project
 
+**Claude Code plugin**:
+The package that a user installs in Claude Code, named `reforger`. It holds the MCP server and the Know-how.
+_Avoid_: Plugin (alone)
+
 **Capability**:
-A job that needs running code, offered to Claude as one or more MCP tools.
-_Avoid_: Feature, module
+One part of the MCP server: a job that needs running code, offered to Claude as one or more Tools.
+_Avoid_: Plugin, feature, module
+
+**Tool**:
+One action that Claude can call on the MCP server, for example `wiki_read`.
+_Avoid_: Command, function
 
 **Know-how**:
-Reforger knowledge written as a skill: steps, rules, examples, and template files.
+Reforger knowledge written as a skill for users: steps, rules, examples, and template files.
 _Avoid_: Guide, docs
 
+**Developer skill**:
+A skill for agents that work on this repo. It does not ship in the Claude Code plugin.
+_Avoid_: Know-how
+
 **Knowledge base**:
-The scraped Enfusion script API docs and wiki pages that ship with the plugin.
+The scraped Enfusion script API docs and wiki pages that ship with the Claude Code plugin.
 _Avoid_: KB, index, database
 
 **Game files**:
@@ -84,9 +96,13 @@ _Avoid_: Game data, assets
 Bohemia's editor for making Reforger mods.
 _Avoid_: Editor, Enfusion Workbench
 
+**Workbench plugin**:
+A script that runs inside Workbench and does a job there when the MCP server asks for it.
+_Avoid_: Plugin (alone)
+
 **Workbench bridge**:
-The connection through which MCP tools control a running Workbench.
+The connection through which Tools control a running Workbench.
 
 **Port**:
-Moving one Capability from the old enfusion-mcp project into this repo, reading and rewriting it as needed.
+Moving one Capability from the old enfusion-mcp project into this repo by translating its TypeScript into Rust.
 _Avoid_: Migration, copy

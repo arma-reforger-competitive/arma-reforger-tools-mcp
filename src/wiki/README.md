@@ -4,11 +4,13 @@ Reads pages of the Arma Reforger wiki from the Knowledge base.
 
 ## Tools
 
-- `wiki_read`: returns the full text of one page by its title, for example `Arma Reforger:Mod Project Setup`. Capital letters do not matter, and underscores from a wiki URL count as spaces. If no page has the title, the answer lists the 3 closest real titles. Pages longer than 100,000 characters are cut.
+- `wiki_read`: returns the full text of one page by its title, for example `Arma Reforger:Mod Project Setup`. Capital letters do not matter, and underscores from a wiki URL count as spaces. If no page has the title, the answer lists the 3 closest real titles. An empty title gives an error with an example title. Pages longer than 100,000 characters are cut.
 
 ## Data
 
-`pages.json` holds 258 pages:
+`pages.json` holds 258 pages. The build puts the file into the server program, and the server checks the data when it starts.
+
+The pages:
 
 - 251 pages from the [BI Community Wiki](https://community.bistudio.com/wiki/Category:Arma_Reforger/Modding), the Arma Reforger modding category.
 - 7 pages from the Enfusion engine docs that ship with the Workbench. These pages have no URL.
