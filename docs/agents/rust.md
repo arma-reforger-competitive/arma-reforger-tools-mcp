@@ -12,10 +12,13 @@ The `rmcp` API changes between versions. Copy from the working code here before 
 
 ## Errors
 
-- Code outside tests does not panic. Return a `Result`, and let `main` show the error.
 - Check data when the server starts, not on the first Tool call. Example: `wiki::tools()` parses `pages.json` and returns the error.
 - A wrong input from Claude is not a Rust error. Answer it as a Tool error with a hint (see `mcp.md`).
-- Use `#[expect(lint, reason = "…")]` only for code that a macro writes, and say which macro in the reason.
+- Use `#[expect]` only for code that a macro writes, and say which macro in the reason.
+
+## Async
+
+- The server runs on one thread. Do blocking work, for example reading `.pak` files or a long search, in `tokio::task::spawn_blocking`, so that the other Tools still answer.
 
 ## Tests
 
