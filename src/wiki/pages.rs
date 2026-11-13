@@ -2,6 +2,13 @@ use std::collections::HashMap;
 
 use serde::Deserialize;
 
+// region:    --- Types
+
+pub(super) struct Pages {
+    pages: Vec<Page>,
+    by_title: HashMap<String, usize>,
+}
+
 /// Every page from the BI Community Wiki has a URL. The Enfusion engine docs have none.
 #[derive(Deserialize)]
 #[serde(tag = "source", rename_all = "kebab-case")]
@@ -13,15 +20,13 @@ pub(super) enum Source {
 #[derive(Deserialize)]
 pub(super) struct Page {
     pub(super) title: String,
+
     #[serde(flatten)]
     pub(super) source: Source,
     pub(super) content: String,
 }
 
-pub(super) struct Pages {
-    pages: Vec<Page>,
-    by_title: HashMap<String, usize>,
-}
+// endregion: --- Types
 
 impl Pages {
     pub(super) fn parse(json: &str) -> Result<Self, serde_json::Error> {
@@ -55,6 +60,8 @@ impl Pages {
             .collect()
     }
 }
+
+// region:    --- Support
 
 /// Wiki URLs write spaces as underscores, so `Mod_Project_Setup` and `mod project setup` are the same title.
 fn title_key(title: &str) -> String {
@@ -96,3 +103,5 @@ fn title_score(query: &str, title: &str) -> f64 {
     let without_namespace = key.split_once(':').map_or(key.as_str(), |(_, rest)| rest);
     similarity(query, &key).max(similarity(query, without_namespace))
 }
+
+// endregion: --- Support
