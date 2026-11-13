@@ -74,15 +74,16 @@ fn page_text(page: &Page) -> String {
 const MAX_CONTENT_CHARS: usize = 100_000;
 
 fn page_content(content: &str) -> Cow<'_, str> {
-    match content.char_indices().nth(MAX_CONTENT_CHARS) {
-        None => Cow::Borrowed(content),
-        Some((cut, _)) => Cow::Owned(format!(
-            "{}\n\n(Cut at {} of {} characters.)",
-            &content[..cut],
-            with_commas(MAX_CONTENT_CHARS),
-            with_commas(content.chars().count()),
-        )),
+    let total = content.chars().count();
+    if total <= MAX_CONTENT_CHARS {
+        return Cow::Borrowed(content);
     }
+    let kept: String = content.chars().take(MAX_CONTENT_CHARS).collect();
+    Cow::Owned(format!(
+        "{kept}\n\n(Cut at {} of {} characters.)",
+        with_commas(MAX_CONTENT_CHARS),
+        with_commas(total),
+    ))
 }
 
 /// Writes 164192 as "164,192".
