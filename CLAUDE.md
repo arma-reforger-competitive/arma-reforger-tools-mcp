@@ -11,8 +11,8 @@ Before you port a Capability, read its old TypeScript code there. Write the same
 A Port is done when all four checks pass:
 
 1. An automated test proves the real behaviour.
-2. The tools give the expected answers when called by hand in MCP Inspector.
-3. One real question in Claude Code uses the tools and gets a correct answer.
+2. Each new Tool gives the expected answers in MCP Inspector: `npx -y @modelcontextprotocol/inspector@2.15.0 --cli target/release/reforger --method tools/call --tool-name <tool> --tool-arg <name>=<value>`. Run `cargo build --release` first.
+3. One real question uses the new Tools and gets a correct answer: `claude -p "<question>" --allowedTools "mcp__plugin_reforger_reforger__<tool>"`.
 4. `docs/build-log.md` has a 3-5 line entry: what was ported, what changed from the old code, and why.
 
 ## Code

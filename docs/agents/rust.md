@@ -2,6 +2,14 @@
 
 `cargo fmt` and `cargo clippy` check most rules. The lints are in `[lints]` in `Cargo.toml`. This file holds only the rules that no tool checks.
 
+## rmcp examples
+
+The `rmcp` API changes between versions. Copy from the working code here before you read the `rmcp` source:
+
+- A server with Tools: `src/main.rs`.
+- A Capability that gives its Tools, and a test with an in-memory client: `src/wiki/mod.rs`.
+- A test that starts the real program over stdio: `tests/server.rs`.
+
 ## Errors
 
 - Code outside tests does not panic. Return a `Result`, and let `main` show the error.
