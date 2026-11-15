@@ -14,3 +14,8 @@ jobs:
       - run: cargo fmt --check
       - run: cargo clippy --all-targets -- -D warnings
       - run: cargo test
+      # Tests of the port-status Developer skill.
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+      - run: node --test .claude/skills/port-status/
