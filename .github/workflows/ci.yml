@@ -12,8 +12,8 @@ jobs:
       # rustup installs the Rust version from rust-toolchain.toml on the first cargo command.
       - uses: Swatinem/rust-cache@v2
       - run: cargo fmt --check
-      - run: cargo clippy --all-targets -- -D warnings
-      - run: cargo test
+      - run: cargo clippy --workspace --all-targets -- -D warnings
+      - run: cargo test --workspace
       # Tests of the port-status Developer skill.
       - uses: actions/setup-node@v7
         with:
