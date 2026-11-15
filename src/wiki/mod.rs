@@ -5,8 +5,11 @@
 mod error;
 mod pages;
 mod read;
+mod search;
+mod sections;
+mod tools;
 
 pub use error::{Error, Result};
-pub use read::tools;
+pub use tools::tools;
 
 // endregion: --- Modules

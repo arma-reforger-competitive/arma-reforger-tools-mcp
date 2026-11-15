@@ -4,7 +4,19 @@ Reads pages of the Arma Reforger wiki and the Enfusion engine pages from the Kno
 
 ## Tools
 
+- `wiki_search`: finds pages by words, for example `server config` or `faction spawn points`. Each result gives the page title, the path of its best Section (for example `game > mods`), and a short text from it. Each page shows once. `limit` sets how many pages come back, from 1 to 10 (default 5). If no page matches, the answer says what to try next.
 - `wiki_read`: returns the full text of one page by its title, for example `Arma Reforger:Mod Project Setup` or `Event System`. Capital letters do not matter, and underscores from a wiki URL count as spaces. If no page has the title, the answer lists the 3 closest real titles. An empty title gives an error with an example title. Pages longer than 100,000 characters are cut.
+  - `section` returns only one Section: a heading name (`mods`) or a path (`game > password`). When a heading name ends more than one path, the answer is an error that lists the full paths. When no Section has the name, the error lists all Sections of the page.
+
+## Search
+
+A Section is one heading with all the text and smaller headings under it (see `GLOSSARY.md`). `sections.rs` splits each page into Sections when the server starts.
+
+`search.rs` ranks pages with BM25, written here with no search library (ADR 0005):
+
+- Each Section is indexed with its heading path and its own text, without link URLs. A heading with no text of its own is left out: the paths of its smaller headings hold its name.
+- Each page title is indexed once as its own text. A page scores its title plus its best Section, so the best Section is the one whose own text matches best.
+- Words are whole words in lowercase. A code name stays one word, and its parts are words too: `missionHeader` also gives `mission` and `header`. There is no stemming.
 
 ## Data
 
