@@ -146,3 +146,7 @@ _Avoid_: Migration, copy
 **Port ledger**:
 The list of every feature of the old enfusion-mcp project, each with one status: ported, not needed, or not yet. It is in `docs/port-ledger.md`, and `/port-status` keeps it up to date.
 _Avoid_: Port list, checklist
+
+**Gap**:
+A moment when Claude, while working on a real mod, needs a Capability or Know-how that the Claude Code plugin does not have. A Gap ends as a Port, as a new Capability or Know-how, or as wontfix.
+_Avoid_: Missing feature, feature request
