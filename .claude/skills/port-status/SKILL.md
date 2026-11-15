@@ -40,4 +40,4 @@ The report reads Claude Code session history in `~/.claude/projects`:
 - A Tool counts when Claude called `mcp__enfusion-mcp__<tool>`. An error is a call whose result has `is_error`.
 - A prompt counts when the owner ran it as a slash command. A resource counts when Claude read its URI with `ReadMcpResourceTool`.
 - Claude cannot call templates, recipes, patterns, knowledge pages, or the animation graph code. Their suggestion comes from the old Tools that use them.
-- "Sessions" means sessions in which the old server appears at all. Claude Code deletes old sessions, so the history covers only the dates in the history line.
+- "Sessions" means sessions in which the old server appears at all. The history covers only the dates in the history line.
