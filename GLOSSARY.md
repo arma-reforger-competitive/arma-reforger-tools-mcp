@@ -63,12 +63,12 @@ The screen before the Event starts, where players pick a Player Slot.
 _Avoid_: Slotting screen, role select
 
 **Element**:
-One unit inside a Faction with its own Leader: the platoon HQ, a squad, or the support element.
-_Avoid_: Section, group (the game's own group system)
+One unit inside a Faction with its own Leader: the platoon HQ, a rifle squad, or the weapons squad.
+_Avoid_: Section, support element, group (the game's own group system)
 
 **Leader**:
-A Player Slot that runs the Briefing for its side: the platoon commander (PC), the platoon sergeant, or a squad leader (SL).
-_Avoid_: Commander (alone), officer
+A Player Slot that runs the Briefing for its side: PL, PSG, SL, or WSL. These role names and their meaning come from the guide's glossary (`posibnyk/GLOSSARY.md`).
+_Avoid_: PC, CMD, commander (alone), officer
 
 **Squad net**:
 The radio channel of one Element. Every player in the Element can talk on it.
