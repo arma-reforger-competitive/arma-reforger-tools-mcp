@@ -25,17 +25,20 @@ claude plugin install reforger@reforger-local
 
 ## Tools
 
-| Tool        | What it does                                      |
-| ----------- | ------------------------------------------------- |
-| `wiki_read` | Returns one Arma Reforger wiki page by its title. |
+| Tool        | What it does                                                            |
+| ----------- | ----------------------------------------------------------------------- |
+| `wiki_read` | Returns one Arma Reforger wiki page or Enfusion engine page by its title. |
 
 ## Development
 
 ```sh
-cargo fmt                                    # fix the format
-cargo clippy --all-targets -- -D warnings    # find code problems
-cargo test                                   # run all tests
+cargo fmt                                                # fix the format
+cargo clippy --workspace --all-targets -- -D warnings    # find code problems
+cargo test --workspace                                   # run all tests
+cargo xtask import                                       # rebuild the Knowledge base after a game update
 ```
+
+`cargo xtask import` needs the Workbench docs of Arma Reforger Tools. [`src/wiki/README.md`](src/wiki/README.md) has the steps.
 
 CI runs the same checks, with `cargo fmt --check`, on every push and pull request. Each Capability has its own folder in `src/`. The rules for Rust code are in [`docs/agents/rust.md`](docs/agents/rust.md), and the rules for Tools are in [`docs/agents/mcp.md`](docs/agents/mcp.md).
 
