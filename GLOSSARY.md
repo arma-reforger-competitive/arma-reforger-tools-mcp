@@ -62,6 +62,38 @@ The game's own system for showing goals to players on the map and in the task li
 The screen before the Event starts, where players pick a Player Slot.
 _Avoid_: Slotting screen, role select
 
+**Element**:
+One unit inside a Faction with its own Leader: the platoon HQ, a squad, or the support element.
+_Avoid_: Section, group (the game's own group system)
+
+**Leader**:
+A Player Slot that runs the Briefing for its side: the platoon commander (PC), the platoon sergeant, or a squad leader (SL).
+_Avoid_: Commander (alone), officer
+
+**Squad net**:
+The radio channel of one Element. Every player in the Element can talk on it.
+_Avoid_: Squad channel, group frequency
+
+**Platoon net**:
+The radio channel that links the Leaders of one Faction.
+_Avoid_: Command net, platoon channel
+
+**Briefing**:
+The phase before the Event starts, where the Leaders of each side look over the map, plan, place markers, and say they are ready.
+_Avoid_: Planning phase, briefing screen
+
+**Preparation phase**:
+The timed phase after all Leaders are ready. Players are in their Start area and cannot fire.
+_Avoid_: Staging phase, safe start, warmup
+
+**Start area**:
+The place where a Faction's players are kept during the Preparation phase, with one spawn point for each Element.
+_Avoid_: Main, base, staging area
+
+**Spectator camera**:
+What a player sees after they die in a One-life Event.
+_Avoid_: Ghost cam, death cam
+
 ## This project
 
 **Claude Code plugin**:
