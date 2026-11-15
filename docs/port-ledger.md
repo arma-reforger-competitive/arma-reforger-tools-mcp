@@ -62,7 +62,7 @@ History: 53 sessions with the old server, from 2026-11-05 to 2026-11-15.
 | `wb_undo_redo` | not yet |  | never used in 53 sessions, suggest: not needed |
 | `wb_validate` | not yet |  | never used in 53 sessions, suggest: not needed |
 | `wiki_read` | ported | [tool wiki_read](../src/wiki/read.rs) | used 8 times in 3 of 53 sessions, 0 errors, last 2026-11-15, suggest: port |
-| `wiki_search` | not yet | [#4](https://github.com/arma-reforger-competitive/arma-reforger-tools-mcp/issues/4) | used 27 times in 4 of 53 sessions, 0 errors, last 2026-11-15, suggest: port |
+| `wiki_search` | ported | [tool wiki_search](../src/wiki/tools.rs) | used 27 times in 4 of 53 sessions, 0 errors, last 2026-11-15, suggest: port |
 | `workshop_info` | not yet |  | never used in 53 sessions, suggest: not needed |
 
 ## Prompts
