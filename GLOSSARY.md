@@ -142,3 +142,7 @@ The connection through which Tools control a running Workbench.
 **Port**:
 Moving one Capability from the old enfusion-mcp project into this repo by translating its TypeScript into Rust.
 _Avoid_: Migration, copy
+
+**Port ledger**:
+The list of every feature of the old enfusion-mcp project, each with one status: ported, not needed, or not yet. It is in `docs/port-ledger.md`, and `/port-status` keeps it up to date.
+_Avoid_: Port list, checklist
