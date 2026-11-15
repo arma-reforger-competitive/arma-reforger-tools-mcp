@@ -9,6 +9,7 @@ use rmcp::{
 use schemars::JsonSchema;
 use serde::Deserialize;
 
+use super::Result;
 use super::pages::{Page, Pages, Source};
 
 /// Claude Code cuts Tool answers longer than about 25,000 tokens, which is about 100,000 characters.
@@ -21,12 +22,12 @@ struct ReadInput {
     title: String,
 }
 
-/// Gives the wiki Tools to the server. It fails when the built-in page data is not valid.
-pub fn tools<S: Send + Sync + 'static>() -> Result<ToolRouter<S>, serde_json::Error> {
-    let pages = Arc::new(Pages::parse(include_str!("pages.json"))?);
+/// Gives the wiki Tools to the server. It fails when a built-in page file is not valid.
+pub fn tools<S: Send + Sync + 'static>() -> Result<ToolRouter<S>> {
+    let pages = Arc::new(Pages::load()?);
     let wiki_read = Tool::new(
         "wiki_read",
-        "Read the full text of one Arma Reforger wiki page by its title. \
+        "Read the full text of one Arma Reforger wiki page or Enfusion engine page by its title. \
          If no page has that title, the answer lists the closest real titles.",
         schema_for_type::<ReadInput>(),
     );
@@ -64,14 +65,15 @@ fn read(pages: &Pages, title: &str) -> CallToolResult {
 }
 
 fn page_text(page: &Page) -> String {
-    let source = match &page.source {
-        Source::BistudioWiki { url } => format!("BI Community Wiki, {url}"),
-        Source::Enfusion => "Enfusion engine docs".to_owned(),
+    let source = match page.source {
+        Source::BistudioWiki => "BI Community Wiki",
+        Source::Enfusion => "Enfusion engine docs",
     };
     format!(
-        "## {}\nSource: {source}\n\n{}",
+        "## {}\nSource: {source}, {}\n\n{}",
         page.title,
-        page_content(&page.content)
+        page.url,
+        page_content(page.content)
     )
 }
 
@@ -150,7 +152,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn names_the_source_of_a_page_that_has_no_url() {
+    async fn names_the_engine_docs_and_their_url_as_the_source_of_an_engine_page() {
         // -- Setup & Fixtures
         let client = connect().await;
 
@@ -159,7 +161,9 @@ mod tests {
 
         // -- Check
         assert!(!page.is_error);
-        assert!(page.text.contains("Source: Enfusion engine docs\n"));
+        assert!(page.text.contains(
+            "Source: Enfusion engine docs, https://community.bistudio.com/wikidata/external-data/arma-reforger/EnfusionScriptAPIPublic/Page_EventSystem.html\n"
+        ));
     }
 
     #[tokio::test]
@@ -173,7 +177,7 @@ mod tests {
         // -- Check
         assert!(!page.is_error);
         assert!(page.text.chars().count() < 100_500);
-        assert!(page.text.contains("Cut at 100,000 of 164,192 characters."));
+        assert!(page.text.contains("Cut at 100,000 of 164,467 characters."));
     }
 
     #[tokio::test]

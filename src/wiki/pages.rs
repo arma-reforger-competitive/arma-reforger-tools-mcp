@@ -1,6 +1,11 @@
 use std::collections::HashMap;
 
-use serde::Deserialize;
+use super::{Error, Result};
+
+/// Every page file of `src/wiki/pages`, as (path under that folder, file text). `build.rs` writes the list.
+const FILES: &[(&str, &str)] = include!(concat!(env!("OUT_DIR"), "/wiki_pages.rs"));
+
+const WIKI_URL: &str = "https://community.bistudio.com/wiki/";
 
 // region:    --- Types
 
@@ -9,28 +14,28 @@ pub(super) struct Pages {
     by_title: HashMap<String, usize>,
 }
 
-/// Every page from the BI Community Wiki has a URL. The Enfusion engine docs have none.
-#[derive(Deserialize)]
-#[serde(tag = "source", rename_all = "kebab-case")]
+/// Pages from the BI Community Wiki, and engine pages from the Enfusion script API docs.
 pub(super) enum Source {
-    BistudioWiki { url: String },
+    BistudioWiki,
     Enfusion,
 }
 
-#[derive(Deserialize)]
 pub(super) struct Page {
     pub(super) title: String,
-
-    #[serde(flatten)]
+    pub(super) url: String,
     pub(super) source: Source,
-    pub(super) content: String,
+    pub(super) content: &'static str,
 }
 
 // endregion: --- Types
 
 impl Pages {
-    pub(super) fn parse(json: &str) -> Result<Self, serde_json::Error> {
-        let pages: Vec<Page> = serde_json::from_str(json)?;
+    /// Reads the page files that are built into the program. It fails when a file has no valid header.
+    pub(super) fn load() -> Result<Self> {
+        let pages = FILES
+            .iter()
+            .map(|(path, text)| parse_page(path, text))
+            .collect::<Result<Vec<_>>>()?;
         let by_title = pages
             .iter()
             .enumerate()
@@ -62,6 +67,25 @@ impl Pages {
 }
 
 // region:    --- Support
+
+/// A page file starts with a header: `---`, `title: ...`, `url: ...`, `---`, then an empty line.
+fn parse_page(path: &'static str, text: &'static str) -> Result<Page> {
+    let bad_header = || Error::BadPageHeader { path };
+    let rest = text.strip_prefix("---\ntitle: ").ok_or_else(bad_header)?;
+    let (title, rest) = rest.split_once("\nurl: ").ok_or_else(bad_header)?;
+    let (url, content) = rest.split_once("\n---\n").ok_or_else(bad_header)?;
+    let source = if url.starts_with(WIKI_URL) {
+        Source::BistudioWiki
+    } else {
+        Source::Enfusion
+    };
+    Ok(Page {
+        title: title.to_owned(),
+        url: url.to_owned(),
+        source,
+        content: content.strip_prefix('\n').unwrap_or(content),
+    })
+}
 
 /// Wiki URLs write spaces as underscores, so `Mod_Project_Setup` and `mod project setup` are the same title.
 fn title_key(title: &str) -> String {
