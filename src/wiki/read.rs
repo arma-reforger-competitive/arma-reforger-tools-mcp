@@ -378,6 +378,27 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn keeps_a_code_line_that_starts_with_a_hash_sign_in_the_section() {
+        // -- Setup & Fixtures
+        let client = connect().await;
+
+        // -- Exec
+        let answer = read_section(
+            &client,
+            "Language Server Protocol: Neovim configuration",
+            "Start LSP client",
+        )
+        .await;
+
+        // -- Check
+        assert!(!answer.is_error, "{}", answer.text);
+        assert!(answer.text.contains(
+            "# In case you are using Neovim 0.12+ you can run following instead\n:lsp enable enforce-ls\n"
+        ));
+        assert!(!answer.text.contains("## Enforce tree-sitter"));
+    }
+
+    #[tokio::test]
     async fn lists_the_sections_of_the_page_when_no_section_has_the_name() {
         // -- Setup & Fixtures
         let client = connect().await;

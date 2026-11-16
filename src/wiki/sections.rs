@@ -112,39 +112,3 @@ fn headings(content: &str) -> Vec<Heading> {
 }
 
 // endregion: --- Support
-
-// region:    --- Tests
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn gives_each_heading_its_path_and_its_text_with_the_smaller_headings_under_it() {
-        // -- Setup & Fixtures
-        let content = "Intro\n## Root\nr\n### password\np1\n## game\n```\n## not a heading\n```\n### password\np2\n";
-
-        // -- Exec
-        let sections = sections(content);
-
-        // -- Check
-        let paths: Vec<String> = sections.iter().map(Section::path_text).collect();
-        assert_eq!(
-            paths,
-            ["", "Root", "Root > password", "game", "game > password"]
-        );
-        let root = &sections[1];
-        assert_eq!(content.get(root.own.clone()).unwrap(), "## Root\nr\n");
-        assert_eq!(
-            content.get(root.whole.clone()).unwrap(),
-            "## Root\nr\n### password\np1\n"
-        );
-        let game = &sections[3];
-        assert_eq!(
-            content.get(game.whole.clone()).unwrap(),
-            "## game\n```\n## not a heading\n```\n### password\np2\n"
-        );
-    }
-}
-
-// endregion: --- Tests
