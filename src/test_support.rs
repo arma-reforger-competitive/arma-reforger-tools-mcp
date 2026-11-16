@@ -1,15 +1,16 @@
-//! Helpers for the tests of every Capability: an in-memory MCP server and client.
+//! Helpers for the tests of every Capability: the real server in memory, and a client.
 
 use rmcp::{
-    ServerHandler, ServiceExt,
+    ServiceExt,
     handler::server::router::tool::ToolRouter,
     model::{CallToolRequestParams, ClientConfig},
     service::{RoleClient, RunningService},
-    tool_handler,
 };
 use serde_json::Value;
 
-/// An MCP client that is connected to a `TestServer`.
+use crate::server::Server;
+
+/// An MCP client that is connected to an in-memory `Server`.
 pub type TestClient = RunningService<RoleClient, ClientConfig>;
 
 /// The text and the error flag of one Tool answer.
@@ -18,23 +19,10 @@ pub struct Answer {
     pub is_error: bool,
 }
 
-/// A server that has only the Tools that a test gives it.
-#[derive(Clone)]
-pub struct TestServer {
-    tools: ToolRouter<Self>,
-}
-
-#[expect(
-    clippy::unused_async_trait_impl,
-    reason = "the rmcp tool_handler macro writes list_tools as async"
-)]
-#[tool_handler(router = self.tools)]
-impl ServerHandler for TestServer {}
-
-/// Serves `tools` on an in-memory server and connects a client to it.
-pub async fn connect(tools: ToolRouter<TestServer>) -> TestClient {
+/// Serves only `tools` on an in-memory `Server` and connects a client to it.
+pub async fn connect(tools: ToolRouter<Server>) -> TestClient {
     let (server_side, client_side) = tokio::io::duplex(1 << 20);
-    let server = TestServer { tools };
+    let server = Server::new(tools);
     tokio::spawn(async move { server.serve(server_side).await.unwrap().waiting().await });
     ClientConfig::default().serve(client_side).await.unwrap()
 }

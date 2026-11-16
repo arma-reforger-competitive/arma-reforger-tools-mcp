@@ -48,4 +48,4 @@ tracing-subscriber = { version = "0.3.23", default-features = false, features = 
 
 [dev-dependencies]
 rmcp = { version = "3.10.0", features = ["client", "transport-child-process"] }
-tokio = { version = "1.54.1", features = ["macros", "rt", "process", "io-util"] }
+tokio = { version = "1.54.1", features = ["macros", "rt", "process", "io-util", "time"] }

@@ -25,6 +25,8 @@ The `rmcp` API changes between versions. Copy from the working code here before 
 ## Async
 
 - The server runs on one thread. Do blocking work, for example reading `.pak` files or a long search, in `tokio::task::spawn_blocking`, so that the other Tools still answer.
+- When Claude cancels a call, `src/server.rs` stops the Tool at its next `await`. Work in `spawn_blocking` does not stop that way. Give the Tool a `CancellationToken` argument (rmcp fills it in), move a clone into the blocking work, and check `is_cancelled()` in each step of its loop.
+- A Tool that writes a file first writes a temp file in the same folder, then renames it. A rename is all or nothing, so a stopped call never leaves half a file.
 
 ## Logs
 
