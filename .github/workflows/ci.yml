@@ -4,6 +4,12 @@ on:
   push:
   pull_request:
 
+# A new push stops the run of the same branch or PR that is still going. Each event type has its
+# own group, so the push run and the pull_request run of one commit do not stop each other.
+concurrency:
+  group: ci-${{ github.event_name }}-${{ github.head_ref || github.ref }}
+  cancel-in-progress: true
+
 jobs:
   # Every check, in the order of `cargo xtask ci` (xtask/src/ci.rs).
   ci:
