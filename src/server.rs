@@ -9,7 +9,7 @@ use rmcp::{
     transport::stdio,
 };
 
-use crate::wiki;
+use crate::{answer_size, wiki};
 
 #[derive(Clone)]
 pub struct Server {
@@ -28,7 +28,8 @@ impl Server {
 )]
 #[tool_handler(router = self.tools, name = "reforger")]
 impl ServerHandler for Server {
-    /// Runs one Tool call. When Claude cancels the call, the Tool stops at its next `await`.
+    /// Runs one Tool call and cuts a long answer. When Claude cancels the call, the Tool stops at
+    /// its next `await`.
     async fn call_tool(
         &self,
         request: CallToolRequestParams,
@@ -39,7 +40,10 @@ impl ServerHandler for Server {
             .tools
             .call(ToolCallContext::new(self, request, context));
         tokio::select! {
-            response = call => response,
+            response = call => response.map(|response| match response {
+                CallToolResponse::Complete(result) => CallToolResponse::Complete(answer_size::cut(result)),
+                other => other,
+            }),
             () = cancelled.cancelled() => Err(ErrorData::internal_error("Claude cancelled the call", None)),
         }
     }

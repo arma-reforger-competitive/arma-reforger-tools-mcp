@@ -36,6 +36,34 @@ async fn starts_the_reforger_server_over_stdio_and_answers_wiki_read() {
 }
 
 #[tokio::test]
+async fn cuts_a_very_long_page_at_100_000_characters_and_says_so() {
+    // -- Setup & Fixtures
+    let server = TokioChildProcess::new(Command::new(env!("CARGO_BIN_EXE_reforger"))).unwrap();
+    let client = ClientConfig::default().serve(server).await.unwrap();
+
+    // -- Exec
+    let arguments = json!({ "title": "Arma Reforger:Diag Menu" });
+    let result = client
+        .call_tool(
+            CallToolRequestParams::new("wiki_read")
+                .with_arguments(arguments.as_object().unwrap().clone()),
+        )
+        .await
+        .unwrap();
+
+    // -- Check
+    assert_eq!(result.is_error, Some(false));
+    let text = &result.content[0]
+        .as_text()
+        .expect("wiki_read did not answer with text")
+        .text;
+    assert!(text.chars().count() < 100_100);
+    assert!(text.ends_with("\n\n(Cut at 100,000 of 164,582 characters.)"));
+
+    client.cancel().await.unwrap();
+}
+
+#[tokio::test]
 async fn describes_every_tool_and_every_tool_input() {
     // -- Setup & Fixtures
     let server = TokioChildProcess::new(Command::new(env!("CARGO_BIN_EXE_reforger"))).unwrap();
