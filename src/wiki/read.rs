@@ -1,6 +1,7 @@
 //! The `wiki_read` Tool.
 
 use std::borrow::Cow;
+use std::collections::HashSet;
 
 use rmcp::model::{CallToolResult, ContentBlock};
 use schemars::JsonSchema;
@@ -128,8 +129,13 @@ fn find_sections<'a>(page: &'a Page, wanted: &str) -> Result<Vec<&'a Section>, S
         .copied()
         .filter(|s| lower(s).ends_with(&parts))
         .collect();
-    let mut paths: Vec<String> = ending.iter().map(|s| s.path_text()).collect();
-    paths.dedup();
+    // Paths that differ only in capital letters are one path, because the match ignores them too.
+    let mut seen = HashSet::new();
+    let paths: Vec<String> = ending
+        .iter()
+        .filter(|s| seen.insert(lower(s)))
+        .map(|s| s.path_text())
+        .collect();
     match paths.len() {
         1 => Ok(ending),
         0 => {
@@ -355,6 +361,20 @@ mod tests {
         // -- Check
         assert!(!answer.is_error, "{}", answer.text);
         assert_eq!(answer.text.matches("## Viewport\n").count(), 2);
+    }
+
+    #[tokio::test]
+    async fn returns_both_sections_when_two_headings_differ_only_in_capital_letters() {
+        // -- Setup & Fixtures
+        let client = connect().await;
+
+        // -- Exec
+        let answer = read_section(&client, "Arma Reforger:Diag Menu", "wheel drag set").await;
+
+        // -- Check
+        assert!(!answer.is_error, "{}", answer.text);
+        assert!(answer.text.contains("## Wheel drag set\n"));
+        assert!(answer.text.contains("## wheel drag set\n"));
     }
 
     #[tokio::test]
