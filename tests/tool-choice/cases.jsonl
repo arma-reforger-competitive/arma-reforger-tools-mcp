@@ -1,0 +1,8 @@
+{"question":"Which method of PlayerCamera gives the focus FOV scale?","tools":["api_search"],"args":{"query":"FOV"}}
+{"question":"Which class does SCR_BaseGameMode inherit from?","tools":["api_search"],"args":{"query":"SCR_BaseGameMode"}}
+{"question":"How do I set up a new mod project in Workbench?","tools":["wiki_search","wiki_read"]}
+{"question":"What is the Scenario Framework in Arma Reforger, and how do I start with it?","tools":["wiki_search"],"args":{"query":"Scenario Framework"}}
+{"question":"Read me the wiki page \"Arma Reforger:Mod Project Setup\".","tools":["wiki_read"],"args":{"title":"Mod Project Setup"}}
+{"question":"Where is the script file of SCR_PreGameGameModeStateComponent in the game?","tools":["game_find"],"args":{"query":"SCR_PreGameGameModeStateComponent"}}
+{"question":"Which Prefab files of the game have M16 in their name?","tools":["game_find"],"args":{"query":"M16"}}
+{"question":"Find the config files of the game's weapon attachments.","tools":["game_find"]}

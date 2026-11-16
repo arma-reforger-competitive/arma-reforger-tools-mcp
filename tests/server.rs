@@ -91,6 +91,72 @@ async fn cuts_a_very_long_page_at_100_000_characters_and_says_so() {
 }
 
 #[tokio::test]
+async fn names_every_served_tool_and_no_other_in_the_server_guide() {
+    // -- Setup & Fixtures
+    let client = start().await;
+
+    // -- Exec
+    let guide = client
+        .peer_info()
+        .unwrap()
+        .instructions
+        .clone()
+        .expect("the server sends a Server guide");
+    let mut named: Vec<&str> = guide.split('`').skip(1).step_by(2).collect();
+    let mut served: Vec<String> = client
+        .list_all_tools()
+        .await
+        .unwrap()
+        .into_iter()
+        .map(|tool| tool.name.to_string())
+        .collect();
+
+    // -- Check
+    named.sort_unstable();
+    named.dedup();
+    served.sort_unstable();
+    assert_eq!(named, served);
+
+    client.cancel().await.unwrap();
+}
+
+#[tokio::test]
+async fn gives_every_tool_a_title_and_all_four_tool_labels() {
+    // -- Setup & Fixtures
+    let client = start().await;
+
+    // -- Exec & Check
+    for tool in client.list_all_tools().await.unwrap() {
+        let name = &tool.name;
+        assert!(
+            tool.title.as_deref().is_some_and(|t| !t.trim().is_empty()),
+            "{name} has no title"
+        );
+        let labels = tool
+            .annotations
+            .unwrap_or_else(|| panic!("{name} has no Tool labels"));
+        assert!(
+            labels.read_only_hint.is_some(),
+            "{name}: say if it is read-only"
+        );
+        assert!(
+            labels.destructive_hint.is_some(),
+            "{name}: say if it is destructive"
+        );
+        assert!(
+            labels.idempotent_hint.is_some(),
+            "{name}: say if it is safe to call again"
+        );
+        assert!(
+            labels.open_world_hint.is_some(),
+            "{name}: say if it uses the internet"
+        );
+    }
+
+    client.cancel().await.unwrap();
+}
+
+#[tokio::test]
 async fn describes_every_tool_and_every_tool_input() {
     // -- Setup & Fixtures
     let client = start().await;

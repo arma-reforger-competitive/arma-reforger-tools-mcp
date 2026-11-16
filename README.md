@@ -36,6 +36,7 @@ claude plugin install reforger@reforger-local
 cargo fmt             # fix the format
 cargo xtask ci        # run every check of CI, in the same order
 cargo xtask import    # rebuild the Knowledge base after a game update
+cargo xtask tool-choice  # check that Claude calls the right Tool (needs a Claude Code login)
 ```
 
 `cargo xtask ci` runs these checks in this order and stops at the first failure. CI runs `cargo xtask ci` on every push and pull request. When you add a check, add it here and to `STEPS` in [`xtask/src/ci.rs`](xtask/src/ci.rs).
@@ -51,6 +52,8 @@ cargo deny --workspace check
 ```
 
 The checks need `ast-grep`, `cargo-deny`, `cargo-nextest`, and Node 24. Install the first three with `cargo install --locked ast-grep cargo-deny cargo-nextest`. `cargo-nextest` runs the tests. Its settings are in [`.config/nextest.toml`](.config/nextest.toml). `ast-grep` stops a `String` used as an error. Its rule is in [`lint/ast-grep/`](lint/ast-grep/).
+
+`cargo xtask tool-choice` asks Claude Code (Haiku) each question in [`tests/tool-choice/cases.jsonl`](tests/tool-choice/cases.jsonl) 3 times, blocks the Tool call, and checks that the first call uses the expected Tool and inputs. At least 90 % must pass. CI does not run it, because it needs a Claude Code login and costs model use: about $0.02 for one run.
 
 `cargo xtask import` needs the Workbench docs of Arma Reforger Tools. [`src/wiki/README.md`](src/wiki/README.md) has the steps.
 

@@ -12,6 +12,7 @@ use super::find::{FindInput, find};
 use super::index::{Index, build};
 use super::settings::Settings;
 use super::{Error, Result};
+use crate::server::read_only_labels;
 
 /// Gives the game-files Tools to the server, with the settings from the environment.
 pub fn tools<S: Send + Sync + 'static>() -> ToolRouter<S> {
@@ -34,7 +35,9 @@ pub(super) fn router<S: Send + Sync + 'static>(settings: Settings) -> ToolRouter
          from the game or from which mod. If no file matches, the answer says how many files it \
          searched. The first call reads the file lists, which takes about a second.",
         schema_for_type::<FindInput>(),
-    );
+    )
+    .with_title("Find Game files")
+    .annotate(read_only_labels());
     ToolRouter::new().with_route((
         game_find,
         move |Parameters(input): Parameters<FindInput>, cancel: CancellationToken| {

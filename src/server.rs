@@ -3,13 +3,33 @@
 use rmcp::{
     ErrorData, RoleServer, ServerHandler, ServiceExt,
     handler::server::{router::tool::ToolRouter, tool::ToolCallContext},
-    model::{CallToolRequestParams, CallToolResponse},
+    model::{
+        CallToolRequestParams, CallToolResponse, Implementation, ServerCapabilities, ServerConfig,
+        ToolAnnotations,
+    },
     service::RequestContext,
     tool_handler,
     transport::stdio,
 };
 
 use crate::{answer_size, api_docs, game_files, wiki};
+
+/// The Server guide: Claude Code reads it once when a session starts. It names every Tool in
+/// backticks, and a test in `tests/server.rs` checks that each name is a served Tool.
+const SERVER_GUIDE: &str =
+    "Arma Reforger modding help. The script API, the wiki, and the game's own \
+files are on this computer, so these Tools answer fast and need no internet.
+
+- `api_search`: classes and methods of the Enfusion and Arma Reforger script API, with \
+signatures and parent classes.
+- `wiki_search`, then `wiki_read`: how-to pages of the Arma Reforger wiki and the Enfusion \
+engine pages.
+- `game_find`: the scripts, Prefabs, and configs of the game and of the Workshop mods that \
+Workbench downloaded. They are inside .pak archives, so grep, find, and file search cannot see \
+them, and they are not in the project folder.
+
+A class name, a method signature, or a game file path from memory is often wrong. These Tools \
+give the real one.";
 
 #[derive(Clone)]
 pub struct Server {
@@ -26,8 +46,15 @@ impl Server {
     clippy::unused_async_trait_impl,
     reason = "the rmcp tool_handler macro writes list_tools as async"
 )]
-#[tool_handler(router = self.tools, name = "reforger")]
+#[tool_handler(router = self.tools)]
 impl ServerHandler for Server {
+    /// The server's name, its Tools, and the Server guide.
+    fn get_info(&self) -> ServerConfig {
+        ServerConfig::new(ServerCapabilities::builder().enable_tools().build())
+            .with_server_info(Implementation::new("reforger", env!("CARGO_PKG_VERSION")))
+            .with_instructions(SERVER_GUIDE)
+    }
+
     /// Runs one Tool call and cuts a long answer. When Claude cancels the call, the Tool stops at
     /// its next `await`.
     async fn call_tool(
@@ -53,6 +80,16 @@ pub async fn run() -> Result<(), Box<dyn std::error::Error>> {
     let server = Server::new(wiki::tools()? + api_docs::tools()? + game_files::tools());
     server.serve(stdio()).await?.waiting().await?;
     Ok(())
+}
+
+/// The Tool labels of a Tool that only reads files on this computer: it changes nothing, a second
+/// call gives the same answer, and it does not use the internet.
+pub fn read_only_labels() -> ToolAnnotations {
+    ToolAnnotations::new()
+        .read_only(true)
+        .destructive(false)
+        .idempotent(true)
+        .open_world(false)
 }
 
 // region:    --- Support

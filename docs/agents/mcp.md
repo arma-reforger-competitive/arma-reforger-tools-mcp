@@ -10,6 +10,26 @@ Write each description for a person who has never seen the Tool. Say what the To
 
 Example: `wiki_read` says that it returns the full text of one page, and that an unknown title gives the closest real titles.
 
+## Tool-choice tests
+
+A Tool description, an input description, and the Server guide decide which Tool Claude calls. A change to any of them is a change in behaviour. Run `cargo xtask tool-choice` after the change, and put the pass rate of the last run in the PR.
+
+A new Tool gets at least 2 Tool-choice tests in `tests/tool-choice/cases.jsonl`. Write the question as a user asks it, not with words from the description. Accept every Tool that gives a good answer.
+
+When a test fails, fix the Tool text and run again. An example in a description can push Claude to it: `wiki_read` gave "Arma Reforger:Mod Project Setup" as an example title, and Claude read that page instead of searching when a question was close to it. Use an example that no test asks about.
+
+## Server guide
+
+The Server guide (`SERVER_GUIDE` in `src/server.rs`) says in a few lines which Tool fits which job. Name each Tool in backticks. When you add, rename, or remove a Tool, change the guide: a test in `tests/server.rs` fails when the guide and the served Tools differ.
+
+## Tool labels
+
+Every Tool has a title and all four Tool labels: read-only, destructive, safe to call again (idempotent), and open-world (it uses the internet). A test in `tests/server.rs` fails when one is missing.
+
+- A Tool that only reads files on this computer uses `server::read_only_labels()`. Example: `wiki_read`.
+- A Tool that changes files is not read-only. It is destructive when it deletes or overwrites a file. A Tool that deletes is its own Tool, separate from the Tools that only read.
+- A Tool that downloads from the Workshop or the wiki is open-world.
+
 ## Answer size
 
 Claude Code cuts a Tool answer at about 25,000 tokens. That is about 100,000 characters. The server cuts every answer at 100,000 characters before Claude Code gets it (`src/answer_size.rs`). It counts the text of all blocks together. A cut answer ends with "(Cut at 100,000 of N characters.)". Example: `wiki_read` of `Arma Reforger:Diag Menu` ends with "(Cut at 100,000 of 164,582 characters.)".

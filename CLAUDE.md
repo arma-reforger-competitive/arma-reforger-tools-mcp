@@ -7,8 +7,8 @@ A Claude Code plugin for Arma Reforger modding: an MCP server for Capabilities, 
 - `src/`: the MCP server. `server.rs` lists the Tools of every Capability. `answer_size.rs` cuts long answers. Read `server.rs` before you add a Capability.
 - `src/<capability>/` (`wiki/`, `api-docs/`, `game-files/`): one Capability each: its Tools, logic, tests, and a `README.md`. Read the folder's `README.md` before you change a Tool (ADR-0004).
 - `src/wiki/pages/` and `src/api-docs/classes.jsonl`: the Knowledge base. `cargo xtask import` writes them from the Workbench docs and `src/wiki/source/export.xml`, which the owner saves from the wiki (ADR-0005). To change them, run the import.
-- `tests/`: tests that start the real program (`server.rs`) or check the Knowledge base files (`knowledge_base.rs`).
-- `xtask/`: developer commands: `cargo xtask ci` runs every check, `cargo xtask import` rebuilds the Knowledge base. Read it before you change a check or the import.
+- `tests/`: tests that start the real program (`server.rs`) or check the Knowledge base files (`knowledge_base.rs`). `tests/tool-choice/cases.jsonl`: the Tool-choice tests.
+- `xtask/`: developer commands: `cargo xtask ci` runs every check, `cargo xtask import` rebuilds the Knowledge base, `cargo xtask tool-choice` runs the Tool-choice tests. Read it before you change a check or the import.
 - `lint/ast-grep/`: the check that stops a `String` used as an error. Read it when `cargo xtask ci` fails at an `ast-grep` step.
 - `docs/adr/`: the decisions and why. `docs/agents/`: the rules for Rust code, Tools, and commits. `docs/port-ledger.md` and `docs/build-log.md`: what is ported and what changed. `docs/sources/`: read-only research copies.
 - `.claude/skills/`: Developer skills of this repo (`port-status`). `.claude-plugin/`: the plugin manifest.
@@ -24,7 +24,7 @@ A Port is done when all five checks pass:
 
 1. An automated test proves the real behaviour.
 2. Each new Tool gives the expected answers in MCP Inspector: `npx -y @modelcontextprotocol/inspector@2.15.0 --cli target/release/reforger --method tools/call --tool-name <tool> --tool-arg <name>=<value>`. Run `cargo build --release` first.
-3. One real question uses the new Tools and gets a correct answer: `claude -p "<question>" --allowedTools "mcp__plugin_reforger_reforger__<tool>"`.
+3. Each new Tool has at least 2 Tool-choice tests in `tests/tool-choice/cases.jsonl`, and `cargo xtask tool-choice` passes.
 4. `docs/build-log.md` has a 3-5 line entry: what was ported, what changed from the old code, and why.
 5. The Port's rows in the Port ledger are marked "ported": `node .claude/skills/port-status/port-status.ts set ported <old feature> --tool <new tool>`. The agent sets this itself, in the Port's PR, when checks 1-4 pass and the ticket has no work left.
 
