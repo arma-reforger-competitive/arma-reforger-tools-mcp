@@ -40,7 +40,7 @@ debug = false
 
 [dependencies]
 # -- Async
-tokio = { version = "1.54.1", features = ["macros", "rt", "io-std"] }
+tokio = { version = "1.54.1", features = ["macros", "rt", "io-std", "io-util", "net", "time"] }
 tokio-util = { version = "0.7.20", default-features = false }
 # -- MCP
 rmcp = { version = "3.10.0", features = ["transport-io"] }
@@ -55,4 +55,5 @@ tracing-subscriber = { version = "0.3.23", default-features = false, features = 
 [dev-dependencies]
 proptest = "1.12.0"
 rmcp = { version = "3.10.0", features = ["client", "transport-child-process"] }
+tempfile = "3.27.0"
 tokio = { version = "1.54.1", features = ["macros", "rt", "process", "io-util", "time"] }
