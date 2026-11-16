@@ -34,3 +34,10 @@
 - Same ranking of names as before: full name, then start of name, then part of name. A full class name now gives the class page with the whole inheritance chain, and the other matches come as a short list with a note that says how to narrow it. Each word of the query is one name, so "PlayerLimit MaxPlayers" finds both. The old code searched the whole text as one name and found nothing.
 - Not ported: enum and property search, the tree format, inherited members, related classes, and matches in class descriptions. The ticket asks only for class and method names. The typo fallback keeps the edit distance of 2 but drops the trigram match, which listed names that only look a little alike.
 - A test set of 12 searches that Claude sent to the old server finds the expected class or method in the first 10 results.
+
+## game_find (#6)
+
+- Ported the .pak reader from the old `src/pak/reader.ts` as `src/game-files/pak.rs`, and added the new `game_find` Tool. Its ranking comes from the old `asset_search`: full file name, then start of name, then part of name, then part of path.
+- Fixed: a file `offset` is a position from the start of the .pak file, not from the DATA chunk. The old reader checked every chunk size, but not the sizes, offsets, and child counts in the FILE table. Now each one is checked, and a property test gives the reader damaged files.
+- Changed: `game_find` also searches the Workshop mods that Workbench downloaded, and names the mod of each path. A class name with `SCR_` also finds the file without the prefix. A damaged .pak file is skipped and named in the answer. The old code skipped it in silence.
+- The settings are `REFORGER_GAME_PATH` and `REFORGER_WORKBENCH_PROFILE_PATH`, in Windows or WSL form. The old `ENFUSION_GAME_PATH` is not read.

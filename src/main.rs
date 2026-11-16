@@ -5,6 +5,8 @@
 mod answer_size;
 #[path = "api-docs/mod.rs"]
 mod api_docs;
+#[path = "game-files/mod.rs"]
+mod game_files;
 mod server;
 mod wiki;
 

@@ -49,6 +49,30 @@ async fn answers_api_search_with_the_class_that_owns_a_method() {
 }
 
 #[tokio::test]
+async fn answers_game_find_with_the_setting_to_fix_when_the_game_folder_is_wrong() {
+    // -- Setup & Fixtures
+    let mut command = Command::new(env!("CARGO_BIN_EXE_reforger"));
+    command.env("REFORGER_GAME_PATH", r"Q:\No Such Folder");
+    let server = TokioChildProcess::new(command).unwrap();
+    let client = ClientConfig::default().serve(server).await.unwrap();
+
+    // -- Exec
+    let (text, is_error) = call(&client, "game_find", json!({ "query": "Camera" })).await;
+
+    // -- Check
+    // In WSL, the Windows path is read as /mnt/q/No Such Folder.
+    assert!(is_error);
+    assert!(
+        text.starts_with(
+            r#"REFORGER_GAME_PATH is "Q:\No Such Folder", but /mnt/q/No Such Folder has no addons folder with .pak files."#
+        ),
+        "{text}"
+    );
+
+    client.cancel().await.unwrap();
+}
+
+#[tokio::test]
 async fn cuts_a_very_long_page_at_100_000_characters_and_says_so() {
     // -- Setup & Fixtures
     let client = start().await;
