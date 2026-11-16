@@ -9,7 +9,8 @@ This repo follows the shared Rust practices in `~/www/home/docs/agents/rust/`. R
 The `rmcp` API changes between versions. Copy from the working code here before you read the `rmcp` source:
 
 - A server with Tools: `src/server.rs`.
-- A Capability that gives its Tools, and a test with an in-memory client: `src/wiki/read.rs`.
+- A Capability that gives its Tools: `src/wiki/tools.rs`.
+- A test with an in-memory client: the tests in `src/wiki/read.rs`.
 - A test that starts the real program over stdio: `tests/server.rs`.
 - An in-memory server and client for the tests of every Capability: `src/test_support.rs`.
 

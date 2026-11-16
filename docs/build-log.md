@@ -25,5 +25,5 @@
 
 - Ported `wiki_search` from the old `src/tools/wiki-search.ts` and `searchWiki` in `src/index/search-engine.ts`. The old tests stay: a known word finds pages, `limit` caps the results, a nonsense word finds nothing.
 - Not ported: the old ranking. It found text inside other words ("mod" matched "model") and gave a common word the same weight as a rare one. The new BM25 ranking scores whole words in each Section and the page title once per page, with no search library (ADR 0005).
-- Changed: each result shows the path of its best Section and a short text, not the first 2,000 characters of the page. `wiki_read` takes a `section`, so Claude reads only that part.
+- Changed: each result shows the path of its best Section and a short text, not the first 2,000 characters of the page, and not the source and the URL: `wiki_read` gives them. `wiki_read` takes a `section`, so Claude reads only that part.
 - A test set of 11 searches that Claude sent to the old server finds the expected page in the top 3.
