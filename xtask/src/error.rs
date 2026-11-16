@@ -2,6 +2,7 @@
 
 use std::fmt;
 use std::path::PathBuf;
+use std::process::ExitStatus;
 
 use crate::wikitext;
 
@@ -31,6 +32,17 @@ pub enum Error {
 
     /// A CSS selector in the Doxygen readers is not valid.
     BadSelector(&'static str),
+
+    /// A check of `cargo xtask ci` failed.
+    CiStepFailed {
+        step: &'static str,
+        status: ExitStatus,
+    },
+    /// A program of `cargo xtask ci` cannot start, for example because it is not installed.
+    CiStepNotStarted {
+        step: &'static str,
+        source: std::io::Error,
+    },
 
     Read {
         path: PathBuf,
@@ -90,6 +102,15 @@ impl fmt::Display for Error {
                 f,
                 "The CSS selector `{css}` in xtask/src/doxygen is not valid."
             ),
+            Self::CiStepFailed { step, status } => write!(
+                f,
+                "ci failed at `{step}`: {status}. Fix it, then run `cargo xtask ci` again."
+            ),
+            Self::CiStepNotStarted { step, source } => write!(
+                f,
+                "ci cannot start `{step}`: {source}. Install the program (see the \"Development\" \
+                 section of README.md)."
+            ),
             Self::Read { path, source } => write!(f, "Cannot read {}: {source}", path.display()),
             Self::Write { path, source } => write!(f, "Cannot write {}: {source}", path.display()),
             Self::Wikitext { title, source } => write!(f, "Page \"{title}\": {source}"),
@@ -107,7 +128,9 @@ impl fmt::Display for Error {
 impl std::error::Error for Error {
     fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
         match self {
-            Self::Read { source, .. } | Self::Write { source, .. } => Some(source),
+            Self::Read { source, .. }
+            | Self::Write { source, .. }
+            | Self::CiStepNotStarted { source, .. } => Some(source),
             Self::Wikitext { source, .. } => Some(source),
             Self::Xml { source, .. } => Some(source),
             Self::XmlEntity { source, .. } => Some(source),
@@ -116,7 +139,8 @@ impl std::error::Error for Error {
             | Self::NoWikiPages { .. }
             | Self::NoEnginePages { .. }
             | Self::SamePath { .. }
-            | Self::BadSelector(_) => None,
+            | Self::BadSelector(_)
+            | Self::CiStepFailed { .. } => None,
         }
     }
 }

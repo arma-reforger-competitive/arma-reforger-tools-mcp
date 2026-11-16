@@ -11,6 +11,8 @@ pub struct Cmd {
 
 #[derive(Subcommand, Debug)]
 pub enum SubCmd {
+    /// Run every check of CI, in the same order as CI. Stops at the first failure.
+    Ci,
     /// Rebuild the Knowledge base from the Workbench docs (`REFORGER_WORKBENCH_DOCS`) and src/wiki/source/export.xml.
     Import(ImportArgs),
 }
