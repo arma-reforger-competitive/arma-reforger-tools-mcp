@@ -1,0 +1,33 @@
+[graph]
+all-features = true
+
+[advisories]
+yanked = "deny"
+ignore = []
+
+[licenses]
+# Permissive licences only. A crate with two licences passes through its permissive one.
+allow = [
+    "Apache-2.0",
+    "Apache-2.0 WITH LLVM-exception",
+    "ISC",
+    "MIT",
+    "Unicode-3.0",
+]
+confidence-threshold = 0.9
+# MPL-2.0 is copyleft for each file: allow it only for named crates that we use unchanged.
+exceptions = [
+    { allow = ["MPL-2.0"], crate = "cssparser" },        # via scraper, in xtask
+    { allow = ["MPL-2.0"], crate = "cssparser-macros" }, # via scraper, in xtask
+    { allow = ["MPL-2.0"], crate = "dtoa-short" },       # via scraper, in xtask
+    { allow = ["MPL-2.0"], crate = "selectors" },        # via scraper, in xtask
+]
+
+[bans]
+multiple-versions = "warn"
+wildcards = "deny"
+allow-wildcard-paths = true
+
+[sources]
+unknown-registry = "deny"
+unknown-git = "deny"
