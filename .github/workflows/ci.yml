@@ -19,3 +19,12 @@ jobs:
         with:
           node-version: 24
       - run: node --test .claude/skills/port-status/port-status.test.ts
+
+  # Licences, RustSec security notices and sources of every dependency (deny.toml).
+  deny:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: EmbarkStudios/cargo-deny-action@v2
+        with:
+          arguments: --workspace
