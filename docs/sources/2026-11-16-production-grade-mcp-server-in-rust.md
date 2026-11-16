@@ -1,4 +1,4 @@
-<!-- Read-only copy. The owner pasted this article on 2026-11-16. It has no author and no link. Do not edit. -->
+<!-- Read-only copy. A ChatGPT deep research run wrote this report. The owner pasted it on 2026-11-16. It has no link, and its citations are broken. Do not edit. -->
 
 # Building a Production-Grade MCP Server in Rust (2026)
 
