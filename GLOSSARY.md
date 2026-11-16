@@ -112,6 +112,18 @@ _Avoid_: Plugin, feature, module
 One action that Claude can call on the MCP server, for example `wiki_read`.
 _Avoid_: Command, function
 
+**Tool label**:
+The title of a Tool and its safety hints: read-only, destructive (it deletes or overwrites), safe to call again, and open-world (it reaches the internet). Clients show them and use them to decide what to ask the user.
+_Avoid_: Annotation (alone), tag
+
+**Server guide**:
+The short text that the MCP server sends once when a session starts. It says which Tool fits which job.
+_Avoid_: Instructions (alone), system prompt
+
+**Tool-choice test**:
+A question to Claude with the Tool, and some of the inputs, that its first call must use. The test blocks the call, so no Tool runs. `cargo xtask tool-choice` runs every Tool-choice test.
+_Avoid_: Eval, benchmark
+
 **Know-how**:
 Reforger knowledge written as a skill for users: steps, rules, examples, and template files.
 _Avoid_: Guide, docs
