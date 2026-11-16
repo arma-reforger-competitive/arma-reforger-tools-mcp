@@ -215,6 +215,9 @@ fn definitions(element: ElementRef) -> String {
                 let body = blocks(child, 0).replace("\n\n", "\n");
                 if term.is_empty() {
                     out.push(body);
+                } else if body.starts_with('|') {
+                    // A table must start on its own line, or Markdown reads it as text.
+                    out.push(format!("**{term}:**\n\n{body}"));
                 } else {
                     out.push(format!("**{term}:** {body}"));
                 }
@@ -225,11 +228,19 @@ fn definitions(element: ElementRef) -> String {
     out.join("\n\n")
 }
 
+/// Markdown reads the first row of a table as its header. A table with no `<th>` in its first row,
+/// for example the parameters of a method, gets an empty header, so that its first row stays data.
 fn table(element: ElementRef) -> String {
-    let rows: Vec<Vec<String>> = element
+    let rows: Vec<ElementRef> = element
         .descendants()
         .filter_map(ElementRef::wrap)
         .filter(|e| e.value().name() == "tr")
+        .collect();
+    let has_header = rows
+        .first()
+        .is_some_and(|row| row.child_elements().any(|cell| cell.value().name() == "th"));
+    let rows: Vec<Vec<String>> = rows
+        .into_iter()
         .map(|row| {
             row.child_elements()
                 .filter(|cell| matches!(cell.value().name(), "td" | "th"))
@@ -240,12 +251,16 @@ fn table(element: ElementRef) -> String {
         .collect();
     let columns = rows.iter().map(Vec::len).max().unwrap_or(0);
     let mut lines = Vec::new();
+    if !has_header {
+        lines.push(format!("|{}", "  |".repeat(columns)));
+        lines.push(format!("|{}", " --- |".repeat(columns)));
+    }
     for (index, row) in rows.iter().enumerate() {
         let cells: Vec<&str> = (0..columns)
             .map(|column| row.get(column).map_or("", String::as_str))
             .collect();
         lines.push(format!("| {} |", cells.join(" | ")));
-        if index == 0 {
+        if index == 0 && has_header {
             lines.push(format!("|{}", " --- |".repeat(columns)));
         }
     }
@@ -316,6 +331,23 @@ mod tests {
         assert_eq!(
             markdown,
             "**Warning:** Only before [insert](https://x.y).\n\n| Key | Value |\n| --- | --- |\n| a\\|b | 1 |"
+        );
+    }
+
+    #[test]
+    fn writes_a_parameter_table_below_its_term_with_every_parameter_as_data() {
+        // -- Exec
+        let markdown = convert(
+            "<dl class=\"params\"><dt>Parameters</dt><dd><table class=\"params\">\
+             <tr><td class=\"paramname\">iNum</td><td>Number of image</td></tr>\
+             <tr><td class=\"paramname\">pWidget</td><td>Widget to set the texture in</td></tr>\
+             </table></dd></dl>",
+        );
+
+        // -- Check
+        assert_eq!(
+            markdown,
+            "**Parameters:**\n\n|  |  |\n| --- | --- |\n| iNum | Number of image |\n| pWidget | Widget to set the texture in |"
         );
     }
 }

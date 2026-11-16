@@ -23,13 +23,13 @@ pub fn exec(export_list: bool) -> Result<()> {
     let docs = env::var_os(DOCS_VAR)
         .map(PathBuf::from)
         .ok_or(Error::DocsPathNotSet)?;
+    let enfusion = ApiFolder::enfusion(&docs);
+    let arma = ApiFolder::arma(&docs);
 
     // -- Wiki and engine pages
     let mut pages = wiki_pages(&export)?;
     let wiki_count = pages.len();
-    pages.extend(doxygen::read_engine_pages(
-        &docs.join("EnfusionScriptAPI/html"),
-    )?);
+    pages.extend(doxygen::read_engine_pages(&enfusion)?);
     let engine_count = pages.len() - wiki_count;
     let changes = knowledge::write_pages(&repo.join("src/wiki/pages"), &pages)?;
     say(&format!(
@@ -40,7 +40,7 @@ pub fn exec(export_list: bool) -> Result<()> {
 
     // -- API classes
     let mut lines = String::new();
-    for folder in api_folders(&docs) {
+    for folder in [enfusion, arma] {
         let classes = doxygen::read_classes(&folder)?;
         say(&format!(
             "API classes from {}: {}",
@@ -87,21 +87,6 @@ fn wiki_pages(export: &Path) -> Result<Vec<PageFile>> {
         pages.push(PageFile::new(page.title, url, &name, &markdown));
     }
     Ok(pages)
-}
-
-fn api_folders(docs: &Path) -> [ApiFolder; 2] {
-    [
-        ApiFolder {
-            source: "enfusion",
-            html_dir: docs.join("EnfusionScriptAPI/html"),
-            public_name: "EnfusionScriptAPIPublic",
-        },
-        ApiFolder {
-            source: "arma",
-            html_dir: docs.join("ArmaReforgerScriptAPIPublic/html"),
-            public_name: "ArmaReforgerScriptAPIPublic",
-        },
-    ]
 }
 
 /// The wiki answers 403 to scripts, so a person saves `export.xml` in a browser.
