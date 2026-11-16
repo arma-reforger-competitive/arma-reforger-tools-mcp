@@ -71,7 +71,7 @@ One unit inside a Faction with its own Leader: the platoon HQ, a rifle squad, or
 _Avoid_: Section, support element, group (the game's own group system)
 
 **Leader**:
-A Player Slot that runs the Briefing for its side: PL, PSG, SL, or WSL. These role names and their meaning come from the guide's glossary (`posibnyk/GLOSSARY.md`).
+A Player Slot that runs the Briefing for its side: PL, PSG, SL, or WSL. These role names and their meaning come from the guide's glossary (`website/GLOSSARY.md`).
 _Avoid_: PC, CMD, commander (alone), officer
 
 **Squad net**:

@@ -4,7 +4,7 @@ version = "0.1.0"
 edition = "2024"
 description = "MCP server of the reforger Claude Code plugin for Arma Reforger modding"
 license = "MIT"
-repository = "https://github.com/arma-reforger-competitive/arma-reforger-tools-mcp"
+repository = "https://github.com/lanka-community/arma-reforger-tools-mcp"
 publish = false
 
 # The xtask crate holds developer commands. `cargo build --release` does not build it.
