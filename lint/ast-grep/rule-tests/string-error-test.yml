@@ -1,0 +1,12 @@
+id: string-error
+valid:
+  - "fn read() -> Result<Page, Error> { Err(Error::PageNotFound { title }) }"
+  - "fn read() -> Result<u32, std::num::ParseIntError> { s.parse() }"
+  - 'fn read() -> Result<String, Error> { Ok(String::from("page")) }'
+  - 'fn read() -> Result<String, Error> { Ok(format!("{title}")) }'
+invalid:
+  - "fn read() -> Result<u32, String> { Ok(1) }"
+  - 'fn read() -> Result<u32, Error> { Err(format!("no page {title}")) }'
+  - "fn read() -> Result<u32, Error> { Err(err.to_string()) }"
+  - 'fn read() -> Result<u32, Error> { Err(String::from("no page")) }'
+  - 'fn read() -> Result<u32, Error> { Err("no page") }'

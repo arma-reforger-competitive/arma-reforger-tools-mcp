@@ -95,6 +95,8 @@ fn source_line(page: &Page) -> String {
 
 /// Finds the Sections that `wanted` names: a full path first, then a path or a heading name at the
 /// end of a path. A name that ends more than one path gives an error that lists the paths.
+// Reason: the hint for a wrong section name from Claude (docs/agents/rust.md, Errors).
+// ast-grep-ignore: string-error
 fn find_sections<'a>(page: &'a Page, wanted: &str) -> Result<Vec<&'a Section>, String> {
     let parts: Vec<String> = wanted
         .split('>')
@@ -139,6 +141,8 @@ fn find_sections<'a>(page: &'a Page, wanted: &str) -> Result<Vec<&'a Section>, S
                 .iter()
                 .map(|s| format!("\"{}\"", s.path_text()))
                 .collect();
+            // Reason: the hint for a wrong section name from Claude (docs/agents/rust.md, Errors).
+            // ast-grep-ignore: string-error
             Err(format!(
                 "The page \"{}\" has no section \"{wanted}\". Its sections are: {}.",
                 page.title,
@@ -147,6 +151,8 @@ fn find_sections<'a>(page: &'a Page, wanted: &str) -> Result<Vec<&'a Section>, S
         }
         _ => {
             let listed: Vec<String> = paths.iter().map(|path| format!("\"{path}\"")).collect();
+            // Reason: the hint for a wrong section name from Claude (docs/agents/rust.md, Errors).
+            // ast-grep-ignore: string-error
             Err(format!(
                 "The page \"{}\" has {} sections named \"{wanted}\". Give one of these paths as the \
                  section: {}.",

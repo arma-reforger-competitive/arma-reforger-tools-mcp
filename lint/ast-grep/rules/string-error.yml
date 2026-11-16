@@ -1,0 +1,22 @@
+id: string-error
+language: rust
+severity: error
+message: String as an error type
+note: |
+  Return a case of the module's Error enum (docs/agents/rust/errors.md), so a caller can match on
+  what failed and each case has its own text. When a String is the answer on purpose, for example a
+  hint for a wrong Tool input, put `// ast-grep-ignore: string-error` with the reason above the line.
+rule:
+  any:
+    - pattern:
+        context: type T = Result<$OK, String>;
+        selector: generic_type
+    - pattern: Err(format!($$$))
+    - pattern: Err($S.to_string())
+    - pattern: Err(String::from($$$))
+    - all:
+        - pattern: Err($S)
+        - has:
+            kind: arguments
+            has:
+              kind: string_literal
