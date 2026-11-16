@@ -19,9 +19,10 @@ pub fn tools<S: Send + Sync + 'static>() -> Result<ToolRouter<S>> {
     let index = Arc::new(Index::new(&pages));
     let wiki_read = Tool::new(
         "wiki_read",
-        "Read one Arma Reforger wiki page or Enfusion engine page by its title, or only one Section \
-         of it with `section`. If no page has that title, the answer lists the closest real titles. \
-         If no Section has that name, the answer lists the Sections of the page.",
+        "Read one Arma Reforger wiki page or Enfusion engine page by its full title in `title`, for \
+         example \"Arma Reforger:Server Config\", or only one Section of it with `section`. If \
+         no page has that title, the answer lists the closest real titles. If no Section has that \
+         name, the answer lists the Sections of the page.",
         schema_for_type::<ReadInput>(),
     )
     .with_title("Read a wiki page")
