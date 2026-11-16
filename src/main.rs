@@ -3,6 +3,8 @@
 // region:    --- Modules
 
 mod answer_size;
+#[path = "api-docs/mod.rs"]
+mod api_docs;
 mod server;
 mod wiki;
 

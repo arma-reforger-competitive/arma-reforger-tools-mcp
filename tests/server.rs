@@ -25,6 +25,30 @@ async fn starts_the_reforger_server_over_stdio_and_answers_wiki_read() {
 }
 
 #[tokio::test]
+async fn answers_api_search_with_the_class_that_owns_a_method() {
+    // -- Setup & Fixtures
+    let client = start().await;
+
+    // -- Exec
+    let (text, is_error) = call(
+        &client,
+        "api_search",
+        json!({ "query": "GetFocusFOVScale" }),
+    )
+    .await;
+
+    // -- Check
+    // From the PlayerCamera page in the Enfusion script API docs.
+    assert!(!is_error);
+    assert!(
+        text.contains("1. PlayerCamera.GetFocusFOVScale (method)"),
+        "{text}"
+    );
+
+    client.cancel().await.unwrap();
+}
+
+#[tokio::test]
 async fn cuts_a_very_long_page_at_100_000_characters_and_says_so() {
     // -- Setup & Fixtures
     let client = start().await;
@@ -138,17 +162,24 @@ async fn read_page(
     client: &RunningService<RoleClient, ClientConfig>,
     title: &str,
 ) -> (String, bool) {
-    let arguments = json!({ "title": title });
+    call(client, "wiki_read", json!({ "title": title })).await
+}
+
+/// Calls `tool` with `arguments` and returns the text of the answer and its error flag.
+async fn call(
+    client: &RunningService<RoleClient, ClientConfig>,
+    tool: &'static str,
+    arguments: Value,
+) -> (String, bool) {
     let result = client
         .call_tool(
-            CallToolRequestParams::new("wiki_read")
-                .with_arguments(arguments.as_object().unwrap().clone()),
+            CallToolRequestParams::new(tool).with_arguments(arguments.as_object().unwrap().clone()),
         )
         .await
         .unwrap();
     let text = result.content[0]
         .as_text()
-        .expect("wiki_read did not answer with text")
+        .unwrap_or_else(|| panic!("{tool} did not answer with text"))
         .text
         .clone();
     (text, result.is_error.unwrap_or(false))
