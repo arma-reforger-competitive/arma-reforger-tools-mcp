@@ -12,7 +12,7 @@ Example: `wiki_read` says that it returns the full text of one page, and that an
 
 ## Answer size
 
-Claude Code cuts a Tool answer at about 25,000 tokens, so the server cuts every answer at 100,000 characters first (`src/answer_size.rs`). It counts the text of all blocks together, and ends a cut answer with "(Cut at 100,000 of N characters.)". Example: `wiki_read` of `Arma Reforger:Diag Menu` ends with "(Cut at 100,000 of 164,582 characters.)".
+Claude Code cuts a Tool answer at about 25,000 tokens. That is about 100,000 characters. The server cuts every answer at 100,000 characters before Claude Code gets it (`src/answer_size.rs`). It counts the text of all blocks together. A cut answer ends with "(Cut at 100,000 of N characters.)". Example: `wiki_read` of `Arma Reforger:Diag Menu` ends with "(Cut at 100,000 of 164,582 characters.)".
 
 A Tool that returns a list keeps the list short with a limit, so that the server does not cut it. Example: `wiki_search` returns at most 10 pages.
 

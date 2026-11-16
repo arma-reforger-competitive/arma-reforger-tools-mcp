@@ -36,5 +36,5 @@ The `rmcp` API changes between versions. Copy from the working code here before 
 ## Tests
 
 - Test a Capability through its public `tools()` function: serve it with `test_support::connect`, call the Tool with `test_support::call`, and check the text and `is_error`. Example: the tests in `src/wiki/read.rs`.
-- `tests/server.rs` starts the real program and calls one Tool from each Capability.
+- `tests/server.rs` starts the real program. It calls one Tool from each Capability, and it tests the work of the server for all Tools, for example the cut of long answers.
 - A Port keeps the expected answers of the old TypeScript tests. Take other expected values from the wiki text.
