@@ -3,13 +3,14 @@
 // region:    --- Modules
 
 mod answer_size;
-mod host_path;
 #[path = "api-docs/mod.rs"]
 mod api_docs;
 #[path = "game-files/mod.rs"]
 mod game_files;
+mod host_path;
 mod server;
 mod wiki;
+mod workbench;
 
 #[cfg(test)]
 mod test_support;

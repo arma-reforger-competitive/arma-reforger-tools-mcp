@@ -6,3 +6,5 @@
 {"question":"Where is the script file of SCR_PreGameGameModeStateComponent in the game?","tools":["game_find"],"args":{"query":"SCR_PreGameGameModeStateComponent"}}
 {"question":"Which Prefab files of the game have M16 in their name?","tools":["game_find"],"args":{"query":"M16"}}
 {"question":"Find the config files of the game's weapon attachments.","tools":["game_find"]}
+{"question":"Is my Arma Reforger Workbench connected to you right now?","tools":["workbench_status"]}
+{"question":"Which mod do I have open in the Reforger editor at the moment?","tools":["workbench_status"]}
