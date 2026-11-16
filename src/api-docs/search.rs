@@ -28,7 +28,8 @@ pub(super) struct SearchInput {
     kind: Option<Kind>,
 }
 
-#[derive(Clone, Copy, PartialEq, Eq, Deserialize, JsonSchema)]
+/// Classes come before methods in a list.
+#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Deserialize, JsonSchema)]
 #[serde(rename_all = "lowercase")]
 pub(super) enum Kind {
     Class,
@@ -64,7 +65,7 @@ pub(super) fn search(classes: &Classes, index: &Index, input: &SearchInput) -> C
             continue;
         };
         if score == Score::FullName
-            && entry.method.is_none()
+            && entry.target == Target::Class
             && let Some(class) = classes.all().get(entry.class)
         {
             pages.push_str(&class_page(classes, class));
@@ -90,7 +91,7 @@ pub(super) fn search(classes: &Classes, index: &Index, input: &SearchInput) -> C
     hits.sort_by(|a, b| {
         b.score
             .cmp(&a.score)
-            .then(a.entry.method.is_some().cmp(&b.entry.method.is_some()))
+            .then(a.entry.kind().cmp(&b.entry.kind()))
             .then(a.entry.key.len().cmp(&b.entry.key.len()))
             .then(a.entry.key.cmp(&b.entry.key))
             .then(a.entry.class.cmp(&b.entry.class))
@@ -139,14 +140,17 @@ impl Index {
             entries.push(Entry {
                 key: class.name.to_lowercase(),
                 class: class_index,
-                method: None,
+                target: Target::Class,
             });
             for (group, (_, methods)) in class.method_groups().iter().enumerate() {
                 for (method_index, method) in methods.iter().enumerate() {
                     entries.push(Entry {
                         key: method.name.to_lowercase(),
                         class: class_index,
-                        method: Some((group, method_index)),
+                        target: Target::Method {
+                            group,
+                            index: method_index,
+                        },
                     });
                 }
             }
@@ -195,45 +199,41 @@ struct Hit<'a> {
     score: Score,
 }
 
-/// One class or one method, as positions in `Classes::all` and `Class::method_groups`.
+/// One class or one method of a class, with its name in lowercase.
 struct Entry {
     key: String,
+
+    /// The position in `Classes::all`.
     class: usize,
-    method: Option<(usize, usize)>,
+    target: Target,
+}
+
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum Target {
+    Class,
+
+    /// The position in `Class::method_groups`: the group, then the method in it.
+    Method {
+        group: usize,
+        index: usize,
+    },
 }
 
 impl Entry {
     /// The Levenshtein distance to `name`, when it is at most `MAX_TYPO_DISTANCE`.
     fn typo_distance(&self, name: &str) -> Option<usize> {
-        let key: Vec<char> = self.key.chars().collect();
-        let name: Vec<char> = name.chars().collect();
-        if key.len().abs_diff(name.len()) > MAX_TYPO_DISTANCE {
+        // Most names differ in length by more than the limit, and a count is cheaper than the
+        // distance.
+        if self.key.chars().count().abs_diff(name.chars().count()) > MAX_TYPO_DISTANCE {
             return None;
         }
-        let mut previous: Vec<usize> = (0..=name.len()).collect();
-        for (i, key_char) in key.iter().enumerate() {
-            let mut current = vec![i + 1];
-            for (j, name_char) in name.iter().enumerate() {
-                let substitute = previous
-                    .get(j)
-                    .map_or(usize::MAX, |cost| cost + usize::from(key_char != name_char));
-                let delete = previous.get(j + 1).map_or(usize::MAX, |cost| cost + 1);
-                let insert = current.get(j).map_or(usize::MAX, |cost| cost + 1);
-                current.push(substitute.min(delete).min(insert));
-            }
-            previous = current;
-        }
-        previous
-            .last()
-            .copied()
-            .filter(|distance| *distance <= MAX_TYPO_DISTANCE)
+        Some(strsim::levenshtein(&self.key, name)).filter(|distance| *distance <= MAX_TYPO_DISTANCE)
     }
 
     fn kind(&self) -> Kind {
-        if self.method.is_some() {
-            Kind::Method
-        } else {
-            Kind::Class
+        match self.target {
+            Target::Class => Kind::Class,
+            Target::Method { .. } => Kind::Method,
         }
     }
 
@@ -256,19 +256,15 @@ impl Entry {
         let Some(class) = classes.all().get(self.class) else {
             return String::new();
         };
-        let method = self.method.and_then(|(group, index)| {
-            class
-                .method_groups()
-                .get(group)
-                .and_then(|(_, methods)| methods.get(index))
-        });
-        if let Some(method) = method {
+        if let Target::Method { group, index } = self.target
+            && let Some((_, methods)) = class.method_groups().get(group)
+            && let Some(method) = methods.get(index)
+        {
             let mut text = format!(
                 "{}.{} (method)\n   {}\n",
                 class.name, method.name, method.signature
             );
-            let summary = summary(&method.description);
-            if let Some(summary) = summary.strip_prefix(" -- ") {
+            if let Some(summary) = summary(&method.description) {
                 let _ = writeln!(text, "   {summary}");
             }
             return text;
@@ -323,7 +319,7 @@ fn class_page(classes: &Classes, class: &Class) -> String {
                 text,
                 "- {}{}",
                 method.signature,
-                summary(&method.description)
+                after_dash(&method.description)
             );
         }
     }
@@ -338,7 +334,7 @@ fn class_page(classes: &Classes, class: &Class) -> String {
                 "- {} {}{}",
                 property.kind,
                 property.name,
-                summary(&property.description)
+                after_dash(&property.description)
             );
         }
     }
@@ -350,17 +346,19 @@ fn class_page(classes: &Classes, class: &Class) -> String {
     text
 }
 
-/// The first paragraph of a description, after " -- ". A table of parameters or a note on the return
-/// value is left out: the signature has the parameters.
-fn summary(description: &str) -> String {
-    let first = description.split("\n\n").next().unwrap_or_default().trim();
+/// The first paragraph of a description. A table of parameters or a note on the return value is
+/// left out: the signature has the parameters.
+fn summary(description: &str) -> Option<String> {
+    let first = description.split("\n\n").next()?.trim();
     if first.is_empty() || first.starts_with("**") {
-        return String::new();
+        return None;
     }
-    format!(
-        " -- {}",
-        first.split_whitespace().collect::<Vec<_>>().join(" ")
-    )
+    Some(first.split_whitespace().collect::<Vec<_>>().join(" "))
+}
+
+/// The summary of a description after " -- ", for the end of a line in a class page.
+fn after_dash(description: &str) -> String {
+    summary(description).map_or_else(String::new, |summary| format!(" -- {summary}"))
 }
 
 // endregion: --- Support

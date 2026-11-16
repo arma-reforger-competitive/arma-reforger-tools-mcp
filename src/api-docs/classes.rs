@@ -14,9 +14,9 @@ const CLASSES_JSONL: &str = include_str!("classes.jsonl");
 pub(super) struct Classes {
     classes: Vec<Class>,
 
-    /// For each class name in lowercase: the positions of the classes with that name. The engine
+    /// For each class name in lowercase: the position of the first class with that name. The engine
     /// and the game docs both have a few classes, for example `RplComponent`.
-    by_name: HashMap<String, Vec<usize>>,
+    by_name: HashMap<String, usize>,
 }
 
 #[derive(Deserialize)]
@@ -106,12 +106,9 @@ impl Classes {
                 })
             })
             .collect::<Result<Vec<Class>>>()?;
-        let mut by_name: HashMap<String, Vec<usize>> = HashMap::new();
+        let mut by_name: HashMap<String, usize> = HashMap::new();
         for (index, class) in classes.iter().enumerate() {
-            by_name
-                .entry(class.name.to_lowercase())
-                .or_default()
-                .push(index);
+            by_name.entry(class.name.to_lowercase()).or_insert(index);
         }
         Ok(Self { classes, by_name })
     }
@@ -122,7 +119,7 @@ impl Classes {
 
     /// Gives the first class with this name. Capital letters do not matter.
     pub(super) fn find(&self, name: &str) -> Option<&Class> {
-        let index = self.by_name.get(&name.to_lowercase())?.first()?;
+        let index = self.by_name.get(&name.to_lowercase())?;
         self.classes.get(*index)
     }
 
