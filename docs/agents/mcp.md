@@ -10,6 +10,10 @@ Write each description for a person who has never seen the Tool. Say what the To
 
 Example: `wiki_read` says that it returns the full text of one page, and that an unknown title gives the closest real titles.
 
+## Server guide
+
+The Server guide (`SERVER_GUIDE` in `src/server.rs`) says in a few lines which Tool fits which job. Name each Tool in backticks. When you add, rename, or remove a Tool, change the guide: a test in `tests/server.rs` fails when the guide and the served Tools differ.
+
 ## Tool labels
 
 Every Tool has a title and all four Tool labels: read-only, destructive, safe to call again (idempotent), and open-world (it uses the internet). A test in `tests/server.rs` fails when one is missing.
