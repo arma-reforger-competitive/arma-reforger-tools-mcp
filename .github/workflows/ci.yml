@@ -5,26 +5,17 @@ on:
   pull_request:
 
 jobs:
-  check-and-test:
+  # Every check, in the order of `cargo xtask ci` (xtask/src/ci.rs).
+  ci:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
       # rustup installs the Rust version from rust-toolchain.toml on the first cargo command.
       - uses: Swatinem/rust-cache@v2
-      - run: cargo fmt --check
-      - run: cargo clippy --workspace --all-targets -- -D warnings
-      - run: cargo test --workspace
-      # Tests of the port-status Developer skill.
       - uses: actions/setup-node@v7
         with:
           node-version: 24
-      - run: node --test .claude/skills/port-status/port-status.test.ts
-
-  # Licences, RustSec security notices and sources of every dependency (deny.toml).
-  deny:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v7
-      - uses: EmbarkStudios/cargo-deny-action@v2
+      - uses: taiki-e/install-action@v2
         with:
-          arguments: --workspace
+          tool: cargo-deny,ast-grep
+      - run: cargo xtask ci
