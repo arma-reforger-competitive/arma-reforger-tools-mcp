@@ -9,7 +9,7 @@ use rmcp::{
     transport::stdio,
 };
 
-use crate::wiki;
+use crate::{answer_size, wiki};
 
 #[derive(Clone)]
 pub struct Server {
@@ -28,7 +28,8 @@ impl Server {
 )]
 #[tool_handler(router = self.tools, name = "reforger")]
 impl ServerHandler for Server {
-    /// Runs one Tool call. When Claude cancels the call, the Tool stops at its next `await`.
+    /// Runs one Tool call and cuts a long answer. When Claude cancels the call, the Tool stops at
+    /// its next `await`.
     async fn call_tool(
         &self,
         request: CallToolRequestParams,
@@ -39,8 +40,10 @@ impl ServerHandler for Server {
             .tools
             .call(ToolCallContext::new(self, request, context));
         tokio::select! {
-            response = call => response,
-            () = cancelled.cancelled() => Err(ErrorData::internal_error("Claude cancelled the call", None)),
+            response = call => response.map(cut_answer),
+            () = cancelled.cancelled() => {
+                Err(ErrorData::internal_error("Claude cancelled the call", None))
+            }
         }
     }
 }
@@ -51,6 +54,18 @@ pub async fn run() -> Result<(), Box<dyn std::error::Error>> {
     server.serve(stdio()).await?.waiting().await?;
     Ok(())
 }
+
+// region:    --- Support
+
+/// Cuts a long answer. A task or a request for input has no answer text yet, so it stays as it is.
+fn cut_answer(response: CallToolResponse) -> CallToolResponse {
+    match response {
+        CallToolResponse::Complete(answer) => CallToolResponse::Complete(answer_size::cut(answer)),
+        other => other,
+    }
+}
+
+// endregion: --- Support
 
 // region:    --- Tests
 

@@ -1,6 +1,5 @@
 //! The `wiki_read` Tool.
 
-use std::borrow::Cow;
 use std::collections::HashSet;
 
 use rmcp::model::{CallToolResult, ContentBlock};
@@ -9,9 +8,6 @@ use serde::Deserialize;
 
 use super::pages::{Page, Pages, Source};
 use super::sections::Section;
-
-/// Claude Code cuts Tool answers longer than about 25,000 tokens, which is about 100,000 characters.
-const MAX_CONTENT_CHARS: usize = 100_000;
 
 #[derive(Deserialize, JsonSchema)]
 pub(super) struct ReadInput {
@@ -67,7 +63,7 @@ fn page_text(page: &Page) -> String {
         "## {}\n{}\n\n{}",
         page.title,
         source_line(page),
-        page_content(page.content)
+        page.content
     )
 }
 
@@ -85,7 +81,7 @@ fn section_text(page: &Page, sections: &[&Section]) -> String {
         "## {} > {path}\n{}\n\n{}\n",
         page.title,
         source_line(page),
-        page_content(&text.join("\n\n"))
+        text.join("\n\n")
     )
 }
 
@@ -162,32 +158,6 @@ fn find_sections<'a>(page: &'a Page, wanted: &str) -> Result<Vec<&'a Section>, S
     }
 }
 
-fn page_content(content: &str) -> Cow<'_, str> {
-    let total = content.chars().count();
-    if total <= MAX_CONTENT_CHARS {
-        return Cow::Borrowed(content);
-    }
-    let kept: String = content.chars().take(MAX_CONTENT_CHARS).collect();
-    Cow::Owned(format!(
-        "{kept}\n\n(Cut at {} of {} characters.)",
-        with_commas(MAX_CONTENT_CHARS),
-        with_commas(total),
-    ))
-}
-
-/// Writes 164192 as "164,192".
-fn with_commas(number: usize) -> String {
-    let digits = number.to_string();
-    let mut text = String::new();
-    for (index, digit) in digits.chars().enumerate() {
-        if index > 0 && (digits.len() - index).is_multiple_of(3) {
-            text.push(',');
-        }
-        text.push(digit);
-    }
-    text
-}
-
 // endregion: --- Support
 
 // region:    --- Tests
@@ -249,20 +219,6 @@ mod tests {
         assert!(page.text.contains(
             "Source: Enfusion engine docs, https://community.bistudio.com/wikidata/external-data/arma-reforger/EnfusionScriptAPIPublic/Page_EventSystem.html\n"
         ));
-    }
-
-    #[tokio::test]
-    async fn cuts_a_very_long_page_at_100_000_characters_and_says_so() {
-        // -- Setup & Fixtures
-        let client = connect().await;
-
-        // -- Exec
-        let page = read_page(&client, "Arma Reforger:Diag Menu").await;
-
-        // -- Check
-        assert!(!page.is_error);
-        assert!(page.text.chars().count() < 100_500);
-        assert!(page.text.contains("Cut at 100,000 of 164,467 characters."));
     }
 
     #[tokio::test]

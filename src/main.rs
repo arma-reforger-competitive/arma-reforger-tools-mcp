@@ -2,6 +2,7 @@
 
 // region:    --- Modules
 
+mod answer_size;
 mod server;
 mod wiki;
 

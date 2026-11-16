@@ -1,6 +1,7 @@
 use rmcp::{
     ServiceExt,
     model::{CallToolRequestParams, ClientConfig},
+    service::{RoleClient, RunningService},
     transport::TokioChildProcess,
 };
 use serde_json::{Value, json};
@@ -10,27 +11,33 @@ use tokio::{io::AsyncWriteExt, process::Command};
 #[tokio::test]
 async fn starts_the_reforger_server_over_stdio_and_answers_wiki_read() {
     // -- Setup & Fixtures
-    let server = TokioChildProcess::new(Command::new(env!("CARGO_BIN_EXE_reforger"))).unwrap();
-    let client = ClientConfig::default().serve(server).await.unwrap();
+    let client = start().await;
 
     // -- Exec
     let server_info = client.peer_info().unwrap().server_info.clone().unwrap();
-    let arguments = json!({ "title": "Arma Reforger:Mod Project Setup" });
-    let result = client
-        .call_tool(
-            CallToolRequestParams::new("wiki_read")
-                .with_arguments(arguments.as_object().unwrap().clone()),
-        )
-        .await
-        .unwrap();
+    let (text, _) = read_page(&client, "Arma Reforger:Mod Project Setup").await;
 
     // -- Check
     assert_eq!(server_info.name, "reforger");
-    let text = &result.content[0]
-        .as_text()
-        .expect("wiki_read did not answer with text")
-        .text;
     assert!(text.contains("## Arma Reforger:Mod Project Setup"));
+
+    client.cancel().await.unwrap();
+}
+
+#[tokio::test]
+async fn cuts_a_very_long_page_at_100_000_characters_and_says_so() {
+    // -- Setup & Fixtures
+    let client = start().await;
+
+    // -- Exec
+    let (text, is_error) = read_page(&client, "Arma Reforger:Diag Menu").await;
+
+    // -- Check
+    assert!(!is_error);
+    assert!(text.chars().count() < 100_100);
+    // Counted by hand: 164,467 characters of page text, 27 of the title line, 86 of the source
+    // line, and 2 of the empty line after it.
+    assert!(text.ends_with("\n\n(Cut at 100,000 of 164,582 characters.)"));
 
     client.cancel().await.unwrap();
 }
@@ -38,8 +45,7 @@ async fn starts_the_reforger_server_over_stdio_and_answers_wiki_read() {
 #[tokio::test]
 async fn describes_every_tool_and_every_tool_input() {
     // -- Setup & Fixtures
-    let server = TokioChildProcess::new(Command::new(env!("CARGO_BIN_EXE_reforger"))).unwrap();
-    let client = ClientConfig::default().serve(server).await.unwrap();
+    let client = start().await;
 
     // -- Exec & Check
     for tool in client.list_all_tools().await.unwrap() {
@@ -118,3 +124,34 @@ async fn writes_logs_to_stderr_and_only_mcp_messages_to_stdout() {
         "the rmcp log is not on stderr: {stderr}"
     );
 }
+
+// region:    --- Test Support
+
+/// Starts the real program and connects a client to it over stdio.
+async fn start() -> RunningService<RoleClient, ClientConfig> {
+    let server = TokioChildProcess::new(Command::new(env!("CARGO_BIN_EXE_reforger"))).unwrap();
+    ClientConfig::default().serve(server).await.unwrap()
+}
+
+/// Calls `wiki_read` with `title` and returns the text of the answer and its error flag.
+async fn read_page(
+    client: &RunningService<RoleClient, ClientConfig>,
+    title: &str,
+) -> (String, bool) {
+    let arguments = json!({ "title": title });
+    let result = client
+        .call_tool(
+            CallToolRequestParams::new("wiki_read")
+                .with_arguments(arguments.as_object().unwrap().clone()),
+        )
+        .await
+        .unwrap();
+    let text = result.content[0]
+        .as_text()
+        .expect("wiki_read did not answer with text")
+        .text
+        .clone();
+    (text, result.is_error.unwrap_or(false))
+}
+
+// endregion: --- Test Support
