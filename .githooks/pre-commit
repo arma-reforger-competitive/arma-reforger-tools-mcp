@@ -1,0 +1,11 @@
+#!/bin/sh
+# Checks that the commit builds. Cargo checks a copy of the staged files, not the files on disk:
+# a new file that is on disk but not staged must not hide a commit that does not compile.
+set -e
+root=$(git rev-parse --show-toplevel)
+copy="$root/target/pre-commit/src"
+rm -rf "$copy"
+mkdir -p "$copy"
+git checkout-index --all --prefix="$copy/"
+cd "$copy"
+CARGO_TARGET_DIR="$root/target/pre-commit/target" exec cargo check --workspace --quiet

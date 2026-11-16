@@ -1,0 +1,2 @@
+#!/bin/sh
+exec node "$HOME/www/home/tools/home.ts" lint-commit "$1"

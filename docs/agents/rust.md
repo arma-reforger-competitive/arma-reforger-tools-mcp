@@ -4,6 +4,8 @@ This repo follows the shared Rust practices in `~/www/home/docs/agents/rust/`. R
 
 `cargo fmt` and `cargo clippy` check most rules. The lints are in `[lints]` in `Cargo.toml`.
 
+`xtask` has its own lint table in `xtask/Cargo.toml`, without `print_stdout` and `print_stderr`. Those two lints protect the stdout of the MCP server, but `xtask` is a command-line tool that prints for a person, so it uses `println!`.
+
 ## rmcp examples
 
 The `rmcp` API changes between versions. Copy from the working code here before you read the `rmcp` source:
