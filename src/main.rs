@@ -3,6 +3,7 @@
 // region:    --- Modules
 
 mod answer_size;
+mod host_path;
 #[path = "api-docs/mod.rs"]
 mod api_docs;
 #[path = "game-files/mod.rs"]
