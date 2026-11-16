@@ -78,12 +78,7 @@ fn section_text(page: &Page, sections: &[&Section]) -> String {
         .map_or_else(String::new, |section| section.path_text());
     let text: Vec<&str> = sections
         .iter()
-        .map(|section| {
-            page.content
-                .get(section.whole.clone())
-                .unwrap_or_default()
-                .trim_end()
-        })
+        .map(|section| section.whole_text(page.content).trim_end())
         .collect();
     format!(
         "## {} > {path}\n{}\n\n{}\n",

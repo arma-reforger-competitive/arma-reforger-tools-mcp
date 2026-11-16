@@ -18,6 +18,16 @@ impl Section {
     pub(super) fn path_text(&self) -> String {
         self.path.join(" > ")
     }
+
+    /// The heading line and the text up to the next heading of any level, from the page `content`.
+    pub(super) fn own_text<'a>(&self, content: &'a str) -> &'a str {
+        content.get(self.own.clone()).unwrap_or_default()
+    }
+
+    /// The heading line and the text with the smaller headings under it, from the page `content`.
+    pub(super) fn whole_text<'a>(&self, content: &'a str) -> &'a str {
+        content.get(self.whole.clone()).unwrap_or_default()
+    }
 }
 
 /// Finds the Sections of a Markdown page. Lines inside code blocks are never headings.

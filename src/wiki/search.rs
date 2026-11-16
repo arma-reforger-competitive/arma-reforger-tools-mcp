@@ -25,7 +25,7 @@ pub(super) struct SearchInput {
     #[schemars(length(min = 1))]
     query: String,
 
-    /// How many pages to return, from 1 to 10. The default is 5.
+    /// How many pages to return, from 1 to 10, for example 3. The default is 5.
     #[schemars(range(min = 1, max = 10))]
     limit: Option<usize>,
 }
@@ -38,15 +38,54 @@ pub(super) struct Index {
     titles: Bm25,
     sections: Bm25,
 
-    /// For each entry of `sections`: its page and its Section, as positions in `Pages::all` and
-    /// `Page::sections`.
-    places: Vec<(usize, usize)>,
+    /// For each entry of `sections`: where its Section is.
+    places: Vec<Place>,
 }
 
-struct Hit {
-    page: usize,
-    section: usize,
-    score: f64,
+/// Answers one `wiki_search` call.
+pub(super) fn search(pages: &Pages, index: &Index, input: &SearchInput) -> CallToolResult {
+    let query = input.query.trim();
+    let query_words: HashSet<String> = words(query).into_iter().collect();
+    if query_words.is_empty() {
+        let text =
+            "The query has no words. Give words to search for, for example \"server config\".";
+        return CallToolResult::error(vec![ContentBlock::text(text)]);
+    }
+    let limit = input.limit.unwrap_or(DEFAULT_LIMIT).clamp(1, MAX_LIMIT);
+    let hits = index.search(&query_words, limit);
+    if hits.is_empty() {
+        let text = format!(
+            "No wiki page matches \"{query}\". Try fewer words, another word for the same thing, \
+             or the name of a class or a setting, for example \"replication\" or \"fastValidation\"."
+        );
+        return CallToolResult::success(vec![ContentBlock::text(text)]);
+    }
+    let mut text = format!(
+        "{} pages match \"{query}\". Read one with wiki_read: give its title, and give `section` \
+         to read only that Section.\n",
+        hits.len()
+    );
+    for (number, hit) in hits.iter().enumerate() {
+        let Some(page) = pages.all().get(hit.place.page) else {
+            continue;
+        };
+        let Some(section) = page.sections.get(hit.place.section) else {
+            continue;
+        };
+        let path = if section.path.is_empty() {
+            "(the text before the first heading)".to_owned()
+        } else {
+            section.path_text()
+        };
+        let _ = write!(
+            text,
+            "\n{}. {}\n   Section: {path}\n   {}\n",
+            number + 1,
+            page.title,
+            snippet(page, section, &query_words)
+        );
+    }
+    CallToolResult::success(vec![ContentBlock::text(text)])
 }
 
 impl Index {
@@ -59,12 +98,15 @@ impl Index {
         for (page_index, page) in pages.all().iter().enumerate() {
             titles.push(words(&page.title));
             for (section_index, section) in page.sections.iter().enumerate() {
-                if body(page, section).trim().is_empty() {
+                if text_below_heading(page, section).trim().is_empty() {
                     continue;
                 }
-                let text = format!("{} {}", section.path_text(), own_text(page, section));
+                let text = format!("{} {}", section.path_text(), searchable_text(page, section));
                 sections.push(words(&text));
-                places.push((page_index, section_index));
+                places.push(Place {
+                    page: page_index,
+                    section: section_index,
+                });
             }
         }
         Self {
@@ -76,42 +118,54 @@ impl Index {
 
     /// Gives the best Section of each page that matches, the best page first. A page that matches only
     /// by its title gives its first Section.
-    fn search(&self, query: &str, limit: usize) -> Vec<Hit> {
-        let query: HashSet<String> = words(query).into_iter().collect();
+    fn search(&self, query: &HashSet<String>, limit: usize) -> Vec<Hit> {
         let mut best: HashMap<usize, Hit> = HashMap::new();
-        for (entry, score) in self.sections.scores(&query) {
-            let Some(&(page, section)) = self.places.get(entry) else {
+        for (entry, score) in self.sections.scores(query) {
+            let Some(&place) = self.places.get(entry) else {
                 continue;
             };
-            if best.get(&page).is_none_or(|hit| score > hit.score) {
-                best.insert(
-                    page,
-                    Hit {
-                        page,
-                        section,
-                        score,
-                    },
-                );
+            if best.get(&place.page).is_none_or(|hit| score > hit.score) {
+                best.insert(place.page, Hit { place, score });
             }
         }
-        for (page, title_score) in self.titles.scores(&query) {
+        for (page, title_score) in self.titles.scores(query) {
             let first_section = self
                 .places
                 .iter()
-                .find(|(p, _)| *p == page)
-                .map(|(_, s)| *s);
+                .find(|place| place.page == page)
+                .map_or(0, |place| place.section);
             let hit = best.entry(page).or_insert(Hit {
-                page,
-                section: first_section.unwrap_or(0),
+                place: Place {
+                    page,
+                    section: first_section,
+                },
                 score: 0.0,
             });
             hit.score += title_score;
         }
         let mut hits: Vec<Hit> = best.into_values().collect();
-        hits.sort_by(|a, b| b.score.total_cmp(&a.score).then(a.page.cmp(&b.page)));
+        hits.sort_by(|a, b| {
+            b.score
+                .total_cmp(&a.score)
+                .then(a.place.page.cmp(&b.place.page))
+        });
         hits.truncate(limit);
         hits
     }
+}
+
+// region:    --- Support
+
+/// A Section, as positions in `Pages::all` and `Page::sections`.
+#[derive(Clone, Copy)]
+struct Place {
+    page: usize,
+    section: usize,
+}
+
+struct Hit {
+    place: Place,
+    score: f64,
 }
 
 /// A BM25 ranking over a list of texts, each given as its words.
@@ -145,12 +199,12 @@ impl Bm25 {
                 }
                 Counts {
                     counts,
-                    len: count(words.len()),
+                    len: to_u32(words.len()),
                 }
             })
             .collect();
         let total_len: f64 = texts.iter().map(|text| f64::from(text.len)).sum();
-        let average_len = total_len / f64::from(count(texts.len()).max(1));
+        let average_len = total_len / f64::from(to_u32(texts.len()).max(1));
         Self {
             texts,
             texts_with,
@@ -160,7 +214,7 @@ impl Bm25 {
 
     /// Gives the position and the score of each text that has a word of the query.
     fn scores(&self, query: &HashSet<String>) -> Vec<(usize, f64)> {
-        let total = f64::from(count(self.texts.len()));
+        let total = f64::from(to_u32(self.texts.len()));
         let weights: Vec<(&String, f64)> = query
             .iter()
             .filter_map(|word| {
@@ -187,55 +241,8 @@ impl Bm25 {
     }
 }
 
-/// Answers one `wiki_search` call.
-pub(super) fn search(pages: &Pages, index: &Index, input: &SearchInput) -> CallToolResult {
-    let query = input.query.trim();
-    if words(query).is_empty() {
-        let text =
-            "The query has no words. Give words to search for, for example \"server config\".";
-        return CallToolResult::error(vec![ContentBlock::text(text)]);
-    }
-    let limit = input.limit.unwrap_or(DEFAULT_LIMIT).clamp(1, MAX_LIMIT);
-    let hits = index.search(query, limit);
-    if hits.is_empty() {
-        let text = format!(
-            "No wiki page matches \"{query}\". Try fewer words, another word for the same thing, \
-             or the name of a class or a setting, for example \"replication\" or \"fastValidation\"."
-        );
-        return CallToolResult::success(vec![ContentBlock::text(text)]);
-    }
-    let mut text = format!(
-        "{} pages match \"{query}\". Read one with wiki_read: give its title, and give `section` \
-         to read only that Section.\n",
-        hits.len()
-    );
-    for (number, hit) in hits.iter().enumerate() {
-        let Some(page) = pages.all().get(hit.page) else {
-            continue;
-        };
-        let Some(section) = page.sections.get(hit.section) else {
-            continue;
-        };
-        let path = if section.path.is_empty() {
-            "(the text before the first heading)".to_owned()
-        } else {
-            section.path_text()
-        };
-        let _ = write!(
-            text,
-            "\n{}. {}\n   Section: {path}\n   {}\n",
-            number + 1,
-            page.title,
-            snippet(page, section, query)
-        );
-    }
-    CallToolResult::success(vec![ContentBlock::text(text)])
-}
-
-// region:    --- Support
-
 /// The Knowledge base has far fewer than 4 billion words, so a count fits in `u32`.
-fn count(len: usize) -> u32 {
+fn to_u32(len: usize) -> u32 {
     u32::try_from(len).unwrap_or(u32::MAX)
 }
 
@@ -279,14 +286,14 @@ fn name_parts(name: &str) -> Vec<String> {
     parts
 }
 
-/// The text of a Section without its smaller headings, and without the URLs of Markdown links.
-fn own_text(page: &Page, section: &Section) -> String {
-    without_link_urls(page.content.get(section.own.clone()).unwrap_or_default())
+/// The own text of a Section, with the heading line, without the URLs of Markdown links.
+fn searchable_text(page: &Page, section: &Section) -> String {
+    without_link_urls(section.own_text(page.content))
 }
 
 /// The own text of a Section without its heading line.
-fn body<'a>(page: &'a Page, section: &Section) -> &'a str {
-    let text = page.content.get(section.own.clone()).unwrap_or_default();
+fn text_below_heading<'a>(page: &'a Page, section: &Section) -> &'a str {
+    let text = section.own_text(page.content);
     if section.path.is_empty() {
         return text;
     }
@@ -310,9 +317,8 @@ fn without_link_urls(text: &str) -> String {
 }
 
 /// The first line of the Section that has a word of the query, cut to about 200 characters.
-fn snippet(page: &Page, section: &Section, query: &str) -> String {
-    let query: HashSet<String> = words(query).into_iter().collect();
-    let text = own_text(page, section);
+fn snippet(page: &Page, section: &Section, query: &HashSet<String>) -> String {
+    let text = searchable_text(page, section);
     let lines: Vec<&str> = text
         .lines()
         .map(str::trim)
