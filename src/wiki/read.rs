@@ -1,45 +1,32 @@
 //! The `wiki_read` Tool.
 
-use std::{borrow::Cow, sync::Arc};
+use std::borrow::Cow;
+use std::collections::HashSet;
 
-use rmcp::{
-    handler::server::{common::schema_for_type, router::tool::ToolRouter, wrapper::Parameters},
-    model::{CallToolResult, ContentBlock, Tool},
-};
+use rmcp::model::{CallToolResult, ContentBlock};
 use schemars::JsonSchema;
 use serde::Deserialize;
 
-use super::Result;
 use super::pages::{Page, Pages, Source};
+use super::sections::Section;
 
 /// Claude Code cuts Tool answers longer than about 25,000 tokens, which is about 100,000 characters.
 const MAX_CONTENT_CHARS: usize = 100_000;
 
 #[derive(Deserialize, JsonSchema)]
-struct ReadInput {
+pub(super) struct ReadInput {
     /// Title of the wiki page, for example "Arma Reforger:Mod Project Setup"
     #[schemars(length(min = 1))]
     title: String,
+
+    /// Only this Section of the page: a heading name, for example "mods", or a path of headings,
+    /// for example "game > password". Leave it out to read the whole page.
+    section: Option<String>,
 }
 
-/// Gives the wiki Tools to the server. It fails when a built-in page file is not valid.
-pub fn tools<S: Send + Sync + 'static>() -> Result<ToolRouter<S>> {
-    let pages = Arc::new(Pages::load()?);
-    let wiki_read = Tool::new(
-        "wiki_read",
-        "Read the full text of one Arma Reforger wiki page or Enfusion engine page by its title. \
-         If no page has that title, the answer lists the closest real titles.",
-        schema_for_type::<ReadInput>(),
-    );
-    Ok(ToolRouter::new().with_route((
-        wiki_read,
-        move |Parameters(input): Parameters<ReadInput>| read(&pages, &input.title),
-    )))
-}
-
-// region:    --- Support
-
-fn read(pages: &Pages, title: &str) -> CallToolResult {
+/// Answers one `wiki_read` call.
+pub(super) fn read(pages: &Pages, input: &ReadInput) -> CallToolResult {
+    let title = input.title.as_str();
     // Underscores count as spaces in a title, so "_" alone is empty too.
     if title
         .trim_matches(|c: char| c == '_' || c.is_whitespace())
@@ -61,20 +48,118 @@ fn read(pages: &Pages, title: &str) -> CallToolResult {
         );
         return CallToolResult::error(vec![ContentBlock::text(text)]);
     };
-    CallToolResult::success(vec![ContentBlock::text(page_text(page))])
+    let wanted = input.section.as_deref().map_or("", str::trim);
+    if wanted.is_empty() {
+        return CallToolResult::success(vec![ContentBlock::text(page_text(page))]);
+    }
+    match find_sections(page, wanted) {
+        Ok(sections) => {
+            CallToolResult::success(vec![ContentBlock::text(section_text(page, &sections))])
+        }
+        Err(text) => CallToolResult::error(vec![ContentBlock::text(text)]),
+    }
 }
 
+// region:    --- Support
+
 fn page_text(page: &Page) -> String {
+    format!(
+        "## {}\n{}\n\n{}",
+        page.title,
+        source_line(page),
+        page_content(page.content)
+    )
+}
+
+/// The text of one Section with the smaller headings under it. Some pages repeat a heading path, for
+/// example "Root > address" in Server Config: then every Section with that path is in the answer.
+fn section_text(page: &Page, sections: &[&Section]) -> String {
+    let path = sections
+        .first()
+        .map_or_else(String::new, |section| section.path_text());
+    let text: Vec<&str> = sections
+        .iter()
+        .map(|section| section.whole_text(page.content).trim_end())
+        .collect();
+    format!(
+        "## {} > {path}\n{}\n\n{}\n",
+        page.title,
+        source_line(page),
+        page_content(&text.join("\n\n"))
+    )
+}
+
+fn source_line(page: &Page) -> String {
     let source = match page.source {
         Source::BistudioWiki => "BI Community Wiki",
         Source::Enfusion => "Enfusion engine docs",
     };
-    format!(
-        "## {}\nSource: {source}, {}\n\n{}",
-        page.title,
-        page.url,
-        page_content(page.content)
-    )
+    format!("Source: {source}, {}", page.url)
+}
+
+/// Finds the Sections that `wanted` names: a full path first, then a path or a heading name at the
+/// end of a path. A name that ends more than one path gives an error that lists the paths.
+fn find_sections<'a>(page: &'a Page, wanted: &str) -> Result<Vec<&'a Section>, String> {
+    let parts: Vec<String> = wanted
+        .split('>')
+        .map(|part| part.trim().to_lowercase())
+        .collect();
+    let lower = |section: &Section| -> Vec<String> {
+        section
+            .path
+            .iter()
+            .map(|name| name.to_lowercase())
+            .collect()
+    };
+    let named: Vec<&Section> = page
+        .sections
+        .iter()
+        .filter(|s| !s.path.is_empty())
+        .collect();
+    let exact: Vec<&Section> = named
+        .iter()
+        .copied()
+        .filter(|s| lower(s) == parts)
+        .collect();
+    if !exact.is_empty() {
+        return Ok(exact);
+    }
+    let ending: Vec<&Section> = named
+        .iter()
+        .copied()
+        .filter(|s| lower(s).ends_with(&parts))
+        .collect();
+    // Paths that differ only in capital letters are one path, because the match ignores them too.
+    let mut seen = HashSet::new();
+    let paths: Vec<String> = ending
+        .iter()
+        .filter(|s| seen.insert(lower(s)))
+        .map(|s| s.path_text())
+        .collect();
+    match paths.len() {
+        1 => Ok(ending),
+        0 => {
+            let all: Vec<String> = named
+                .iter()
+                .map(|s| format!("\"{}\"", s.path_text()))
+                .collect();
+            Err(format!(
+                "The page \"{}\" has no section \"{wanted}\". Its sections are: {}.",
+                page.title,
+                all.join(", ")
+            ))
+        }
+        _ => {
+            let listed: Vec<String> = paths.iter().map(|path| format!("\"{path}\"")).collect();
+            Err(format!(
+                "The page \"{}\" has {} sections named \"{wanted}\". Give one of these paths as the \
+                 section: {}.",
+                page.title,
+                paths.len(),
+                listed.join(", ")
+            ))
+        }
+    }
 }
 
 fn page_content(content: &str) -> Cow<'_, str> {
@@ -215,10 +300,130 @@ mod tests {
         }
     }
 
+    #[tokio::test]
+    async fn returns_only_the_section_with_the_heading_name() {
+        // -- Setup & Fixtures
+        let client = connect().await;
+
+        // -- Exec
+        let answer = read_section(&client, "Arma Reforger:Server Config", "mods").await;
+
+        // -- Check
+        assert!(!answer.is_error, "{}", answer.text);
+        assert!(answer.text.starts_with("## Arma Reforger:Server Config > game > mods\nSource: BI Community Wiki, https://community.bistudio.com/wiki/Arma_Reforger:Server_Config\n\n### mods\n"));
+        assert!(answer.text.contains("#### modID"));
+        assert!(!answer.text.contains("## gameProperties"));
+        assert!(answer.text.len() < 5_000);
+    }
+
+    #[tokio::test]
+    async fn returns_the_section_with_the_path_when_two_headings_have_the_same_name() {
+        // -- Setup & Fixtures
+        let client = connect().await;
+
+        // -- Exec
+        let answer = read_section(&client, "Arma Reforger:Server Config", "Game > Password").await;
+
+        // -- Check
+        assert!(!answer.is_error, "{}", answer.text);
+        assert!(
+            answer
+                .text
+                .starts_with("## Arma Reforger:Server Config > game > password\n")
+        );
+        assert!(!answer.text.contains("### passwordAdmin"));
+    }
+
+    #[tokio::test]
+    async fn lists_the_full_paths_when_the_heading_name_is_used_more_than_once() {
+        // -- Setup & Fixtures
+        let client = connect().await;
+
+        // -- Exec
+        let answer = read_section(&client, "Arma Reforger:Server Config", "password").await;
+
+        // -- Check
+        assert!(answer.is_error);
+        assert_eq!(
+            answer.text,
+            "The page \"Arma Reforger:Server Config\" has 2 sections named \"password\". Give one of these paths as the section: \"rcon > password\", \"game > password\"."
+        );
+    }
+
+    #[tokio::test]
+    async fn returns_every_section_when_the_page_repeats_the_same_path() {
+        // -- Setup & Fixtures
+        let client = connect().await;
+
+        // -- Exec
+        let answer = read_section(&client, "Arma Reforger:World Editor", "Viewport").await;
+
+        // -- Check
+        assert!(!answer.is_error, "{}", answer.text);
+        assert_eq!(answer.text.matches("## Viewport\n").count(), 2);
+    }
+
+    #[tokio::test]
+    async fn returns_both_sections_when_two_headings_differ_only_in_capital_letters() {
+        // -- Setup & Fixtures
+        let client = connect().await;
+
+        // -- Exec
+        let answer = read_section(&client, "Arma Reforger:Diag Menu", "wheel drag set").await;
+
+        // -- Check
+        assert!(!answer.is_error, "{}", answer.text);
+        assert!(answer.text.contains("## Wheel drag set\n"));
+        assert!(answer.text.contains("## wheel drag set\n"));
+    }
+
+    #[tokio::test]
+    async fn keeps_a_code_line_that_starts_with_a_hash_sign_in_the_section() {
+        // -- Setup & Fixtures
+        let client = connect().await;
+
+        // -- Exec
+        let answer = read_section(
+            &client,
+            "Language Server Protocol: Neovim configuration",
+            "Start LSP client",
+        )
+        .await;
+
+        // -- Check
+        assert!(!answer.is_error, "{}", answer.text);
+        assert!(answer.text.contains(
+            "# In case you are using Neovim 0.12+ you can run following instead\n:lsp enable enforce-ls\n"
+        ));
+        assert!(!answer.text.contains("## Enforce tree-sitter"));
+    }
+
+    #[tokio::test]
+    async fn lists_the_sections_of_the_page_when_no_section_has_the_name() {
+        // -- Setup & Fixtures
+        let client = connect().await;
+
+        // -- Exec
+        let answer = read_section(&client, "Arma Reforger:Server Config", "nothing here").await;
+
+        // -- Check
+        assert!(answer.is_error);
+        assert!(answer.text.starts_with("The page \"Arma Reforger:Server Config\" has no section \"nothing here\". Its sections are: \"Summary\", \"Root\", \"Root > bindAddress\""));
+    }
+
     // -- Test Support
 
+    async fn read_section(client: &TestClient, title: &str, section: &str) -> Answer {
+        test_support::call(
+            client,
+            "wiki_read",
+            json!({ "title": title, "section": section }),
+        )
+        .await
+    }
+
     async fn connect() -> TestClient {
-        test_support::connect(super::tools().unwrap()).await
+        test_support::connect(crate::wiki::tools().unwrap()).await
     }
 
     async fn read_page(client: &TestClient, title: &str) -> Answer {

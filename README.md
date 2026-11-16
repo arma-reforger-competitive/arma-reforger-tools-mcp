@@ -1,6 +1,6 @@
 # Arma Reforger Tools MCP
 
-> **Work in progress.** The plugin installs and has one tool, `wiki_read`. Follow the [roadmap](https://github.com/arma-reforger-competitive/arma-reforger-tools-mcp/issues/1) to see what is done and what comes next.
+> **Work in progress.** The plugin installs and has two tools, `wiki_search` and `wiki_read`. Follow the [roadmap](https://github.com/arma-reforger-competitive/arma-reforger-tools-mcp/issues/1) to see what is done and what comes next.
 
 `reforger` is a Claude Code plugin that helps you learn, build, and fix Arma Reforger mods. It gives Claude two kinds of help:
 
@@ -25,9 +25,10 @@ claude plugin install reforger@reforger-local
 
 ## Tools
 
-| Tool        | What it does                                                            |
-| ----------- | ----------------------------------------------------------------------- |
-| `wiki_read` | Returns one Arma Reforger wiki page or Enfusion engine page by its title. |
+| Tool          | What it does                                                                                     |
+| ------------- | ------------------------------------------------------------------------------------------------ |
+| `wiki_search` | Finds wiki pages and engine pages by words, with the best Section of each.                       |
+| `wiki_read`   | Returns one Arma Reforger wiki page or Enfusion engine page by its title, or one Section of it. |
 
 ## Development
 

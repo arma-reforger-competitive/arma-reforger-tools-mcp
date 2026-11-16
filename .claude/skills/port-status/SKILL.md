@@ -4,7 +4,7 @@ description: Show what is left to port from the old enfusion-mcp project, and re
 disable-model-invocation: true
 ---
 
-The **Port ledger** (`docs/port-ledger.md`) lists every feature of the old project with one status: `ported`, `not needed`, or `not yet`. The owner decides every status. A suggestion is only evidence for the owner.
+The **Port ledger** (`docs/port-ledger.md`) lists every feature of the old project with one status: `ported`, `not needed`, or `not yet`. The owner decides `not needed` and `not yet`. An agent sets `ported` when its Port is done (check 5 in `CLAUDE.md`). A suggestion is only evidence for the owner.
 
 `port-status.ts` in this folder does all reading and writing of the ledger. Change the ledger only through it. `node .claude/skills/port-status/port-status.ts help` shows the commands.
 
@@ -27,7 +27,7 @@ The **Port ledger** (`docs/port-ledger.md`) lists every feature of the old proje
 
 4. **Verdict.** Run `report` again. Give the owner its last block: "Port done: nothing left in the old repo." or "Not done: N features still open." with the list.
 
-5. **Commit.** The ledger is data: commit `docs/port-ledger.md` straight to `main` with `docs(port-status): <what was decided>`.
+5. **Commit.** The ledger is data: commit the owner's decisions in `docs/port-ledger.md` straight to `main` with `docs(port-status): <what was decided>`. A `ported` row that a Port sets goes in the Port's PR, so it turns true when the PR merges.
 
 ## Port tickets
 

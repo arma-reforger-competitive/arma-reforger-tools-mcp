@@ -1,5 +1,6 @@
 use std::collections::HashMap;
 
+use super::sections::{Section, sections};
 use super::{Error, Result};
 
 /// Every page file of `src/wiki/pages`, as (path under that folder, file text). `build.rs` writes the list.
@@ -25,6 +26,7 @@ pub(super) struct Page {
     pub(super) url: String,
     pub(super) source: Source,
     pub(super) content: &'static str,
+    pub(super) sections: Vec<Section>,
 }
 
 // endregion: --- Types
@@ -42,6 +44,10 @@ impl Pages {
             .map(|(index, page)| (title_key(&page.title), index))
             .collect();
         Ok(Self { pages, by_title })
+    }
+
+    pub(super) fn all(&self) -> &[Page] {
+        &self.pages
     }
 
     pub(super) fn find(&self, title: &str) -> Option<&Page> {
@@ -79,11 +85,13 @@ fn parse_page(path: &'static str, text: &'static str) -> Result<Page> {
     } else {
         Source::Enfusion
     };
+    let content = content.strip_prefix('\n').unwrap_or(content);
     Ok(Page {
         title: title.to_owned(),
         url: url.to_owned(),
         source,
-        content: content.strip_prefix('\n').unwrap_or(content),
+        content,
+        sections: sections(content),
     })
 }
 
