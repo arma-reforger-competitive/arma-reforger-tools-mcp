@@ -32,7 +32,7 @@ pub(super) fn router<S: Send + Sync + 'static>(settings: Settings) -> ToolRouter
          Returns the real paths, best match first: the full file name, then names that start \
          with the query, then names and paths that have it inside. Each path says if it comes \
          from the game or from which mod. If no file matches, the answer says how many files it \
-         searched. The first call reads the file lists and can take a few seconds.",
+         searched. The first call reads the file lists, which takes about a second.",
         schema_for_type::<FindInput>(),
     );
     ToolRouter::new().with_route((

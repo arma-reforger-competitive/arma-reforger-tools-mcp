@@ -23,10 +23,10 @@ Set them in the `env` of Claude Code's `settings.json`. A path works in Windows 
 
 The file lists come from the FILE table of each .pak archive:
 
-- The game: every `.pak` file in `<game>/addons` and one folder down, for example `addons/data/data007.pak`. The game has 19 archives with about 258,000 files.
+- The game: every `.pak` file in `<game>/addons` and one folder down, for example `addons/data/data007.pak`. The game has 19 archives with about 251,000 files.
 - The mods: every `.pak` file in `<profile>/addons/<Name>_<ID>/`. The mod name is the folder name without the 16-digit ID.
 
-The first `game_find` call reads all file lists, outside the server thread, in less than a second. The server keeps them until it stops, so a mod that you download later shows after a restart. A damaged .pak file is skipped, and the answer names it.
+The first `game_find` call reads all file lists, outside the server thread, in about a second. The server keeps them until it stops, so a mod that you download later shows after a restart. A damaged .pak file is skipped, and the answer names it.
 
 `pak.rs` reads the FILE table. It is translated from `src/pak/reader.ts` of enfusion-mcp, with two changes:
 

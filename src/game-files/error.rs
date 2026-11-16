@@ -14,7 +14,7 @@ pub enum Error {
 
     /// The game folder has no `addons` folder with .pak files.
     NoGamePaks {
-        setting: String,
+        value: String,
         folder: PathBuf,
     },
 
@@ -71,9 +71,9 @@ impl fmt::Display for Error {
                  ArmaReforger.exe, for example \"D:\\SteamLibrary\\steamapps\\common\\Arma Reforger\" \
                  or \"/mnt/d/SteamLibrary/steamapps/common/Arma Reforger\". Then restart Claude Code."
             ),
-            Self::NoGamePaks { setting, folder } => write!(
+            Self::NoGamePaks { value, folder } => write!(
                 f,
-                "{GAME_SETTING} is \"{setting}\", but {} has no addons folder with .pak files. Set \
+                "{GAME_SETTING} is \"{value}\", but {} has no addons folder with .pak files. Set \
                  {GAME_SETTING} to the game folder, the folder that holds ArmaReforger.exe and \
                  addons. Then restart Claude Code.",
                 folder.display()

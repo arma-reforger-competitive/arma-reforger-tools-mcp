@@ -8,7 +8,7 @@ use rmcp::model::{CallToolResult, ContentBlock};
 use schemars::JsonSchema;
 use serde::Deserialize;
 
-use super::index::{GAME, GameFile, Index};
+use super::index::{GameFile, Index};
 
 const DEFAULT_LIMIT: usize = 20;
 const MAX_LIMIT: usize = 100;
@@ -27,7 +27,8 @@ pub(super) struct FindInput {
 
 /// Answers one `game_find` call.
 pub(super) fn find(index: &Index, input: &FindInput) -> CallToolResult {
-    let query = input.query.trim().replace('\\', "/").to_lowercase();
+    let shown = input.query.trim();
+    let query = shown.replace('\\', "/").to_lowercase();
     if query.is_empty() {
         let text = "The query is empty. Give a part of a file name or a class name, for example \
                     \"CharacterCameraHandler\" or \"SCR_PreGameGameModeStateComponent\".";
@@ -60,34 +61,23 @@ pub(super) fn find(index: &Index, input: &FindInput) -> CallToolResult {
     if hits.is_empty() {
         let _ = writeln!(
             text,
-            "No Game file has \"{}\" in its name or path. Searched {} files in {}. Try a shorter \
+            "No Game file has \"{shown}\" in its name or path. Searched {} files in {}. Try a shorter \
              part of the name, for example one word of a class name.",
-            input.query.trim(),
             index.files.len(),
-            searched(index)
+            index.searched()
         );
     } else if hits.len() > limit {
         let _ = writeln!(
             text,
-            "{} Game files match \"{}\". The first {limit} come below. Give a longer part of the \
+            "{} Game files match \"{shown}\". The first {limit} come below. Give a longer part of the \
              name to narrow the search, or a larger limit (at most {MAX_LIMIT}).",
-            hits.len(),
-            input.query.trim()
+            hits.len()
         );
     } else {
-        let _ = writeln!(
-            text,
-            "{} Game files match \"{}\":",
-            hits.len(),
-            input.query.trim()
-        );
+        let _ = writeln!(text, "{} Game files match \"{shown}\":", hits.len());
     }
     for (_, file) in hits.iter().take(limit) {
-        let source = match index.sources.get(file.source) {
-            Some(name) if file.source > 0 => format!("mod {name}"),
-            _ => GAME.to_owned(),
-        };
-        let _ = writeln!(text, "- {} ({source})", file.path);
+        let _ = writeln!(text, "- {} ({})", file.path, index.source_of(file));
     }
     for note in &index.notes {
         let _ = write!(text, "\n{note}\n");
@@ -123,16 +113,6 @@ fn score(file: &GameFile, name: &str) -> Option<Score> {
         Some(Score::InPath)
     } else {
         None
-    }
-}
-
-/// "the game", or "the game and 2 mods (tvtLobby, Other)".
-fn searched(index: &Index) -> String {
-    let mods = index.sources.get(1..).unwrap_or_default();
-    match mods.len() {
-        0 => "the game".to_owned(),
-        1 => format!("the game and 1 mod ({})", mods.join(", ")),
-        count => format!("the game and {count} mods ({})", mods.join(", ")),
     }
 }
 

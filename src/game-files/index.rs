@@ -10,7 +10,7 @@ use super::settings::{PROFILE_SETTING, Settings, host_path};
 use super::{Error, Result};
 
 /// The name of the first source: the game itself.
-pub(super) const GAME: &str = "game";
+const GAME: &str = "game";
 
 /// Every Game file, with the names of the sources and notes about what was not searched.
 pub(super) struct Index {
@@ -41,7 +41,7 @@ pub(super) fn build(settings: &Settings, cancel: &CancellationToken) -> Result<I
     collect_paks(&game_folder.join("addons"), 2, &mut game_paks);
     if game_paks.is_empty() {
         return Err(Error::NoGamePaks {
-            setting: raw_game.to_owned(),
+            value: raw_game.to_owned(),
             folder: game_folder,
         });
     }
@@ -86,6 +86,24 @@ pub(super) fn build(settings: &Settings, cancel: &CancellationToken) -> Result<I
 }
 
 impl Index {
+    /// Where `file` comes from: "game", or "mod tvtLobby".
+    pub(super) fn source_of(&self, file: &GameFile) -> String {
+        match self.sources.get(file.source) {
+            Some(name) if file.source > 0 => format!("mod {name}"),
+            _ => GAME.to_owned(),
+        }
+    }
+
+    /// What the search covered: "the game", or "the game and 2 mods (tvtLobby, Other)".
+    pub(super) fn searched(&self) -> String {
+        let mods = self.sources.get(1..).unwrap_or_default();
+        match mods.len() {
+            0 => "the game".to_owned(),
+            1 => format!("the game and 1 mod ({})", mods.join(", ")),
+            count => format!("the game and {count} mods ({})", mods.join(", ")),
+        }
+    }
+
     /// Adds the files of `paks` from the source at `source`.
     fn add(&mut self, source: usize, paks: &[PathBuf], cancel: &CancellationToken) -> Result<()> {
         for pak in paks {
