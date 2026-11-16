@@ -3,7 +3,7 @@
 use rmcp::{
     ErrorData, RoleServer, ServerHandler, ServiceExt,
     handler::server::{router::tool::ToolRouter, tool::ToolCallContext},
-    model::{CallToolRequestParams, CallToolResponse},
+    model::{CallToolRequestParams, CallToolResponse, ToolAnnotations},
     service::RequestContext,
     tool_handler,
     transport::stdio,
@@ -53,6 +53,16 @@ pub async fn run() -> Result<(), Box<dyn std::error::Error>> {
     let server = Server::new(wiki::tools()? + api_docs::tools()? + game_files::tools());
     server.serve(stdio()).await?.waiting().await?;
     Ok(())
+}
+
+/// The Tool labels of a Tool that only reads files on this computer: it changes nothing, a second
+/// call gives the same answer, and it does not use the internet.
+pub fn read_only_labels() -> ToolAnnotations {
+    ToolAnnotations::new()
+        .read_only(true)
+        .destructive(false)
+        .idempotent(true)
+        .open_world(false)
 }
 
 // region:    --- Support

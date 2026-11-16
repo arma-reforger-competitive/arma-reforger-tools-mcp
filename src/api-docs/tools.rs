@@ -10,6 +10,7 @@ use rmcp::model::Tool;
 use super::Result;
 use super::classes::Classes;
 use super::search::{Index, SearchInput, search};
+use crate::server::read_only_labels;
 
 /// Gives the api-docs Tools to the server. It fails when a line of `classes.jsonl` is not valid.
 pub fn tools<S: Send + Sync + 'static>() -> Result<ToolRouter<S>> {
@@ -24,7 +25,9 @@ pub fn tools<S: Send + Sync + 'static>() -> Result<ToolRouter<S>> {
          parent, and each method with its class and signature. If no name matches, the answer \
          lists the names with almost the same spelling.",
         schema_for_type::<SearchInput>(),
-    );
+    )
+    .with_title("Search the script API")
+    .annotate(read_only_labels());
     Ok(ToolRouter::new().with_route((
         api_search,
         move |Parameters(input): Parameters<SearchInput>| search(&classes, &index, &input),
