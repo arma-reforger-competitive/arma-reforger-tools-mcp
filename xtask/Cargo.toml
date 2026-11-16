@@ -6,8 +6,24 @@ description = "Developer commands of the reforger plugin repo, for example `carg
 license = "MIT"
 publish = false
 
-[lints]
-workspace = true
+# The workspace lints without `print_stdout` and `print_stderr`: those protect the stdout of the MCP
+# server, but xtask is a command-line tool that prints for a person. Cargo cannot change single
+# workspace lints, so the list is here in full. Keep it the same as the workspace list otherwise.
+[lints.rust]
+unsafe_code = "forbid"
+
+[lints.clippy]
+pedantic = { level = "warn", priority = -1 }
+unwrap_used = "deny"
+expect_used = "deny"
+panic = "warn"
+todo = "warn"
+unimplemented = "warn"
+unreachable = "warn"
+indexing_slicing = "warn"
+string_slice = "warn"
+allow_attributes = "warn"
+allow_attributes_without_reason = "warn"
 
 [dependencies]
 # -- Serde & Content Formats

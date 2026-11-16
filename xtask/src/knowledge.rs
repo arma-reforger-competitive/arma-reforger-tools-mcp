@@ -135,13 +135,20 @@ fn markdown_files(dir: &Path) -> Result<BTreeSet<PathBuf>> {
         return Ok(files);
     };
     for entry in entries {
-        let path = entry
+        let entry = entry.map_err(|source| Error::Read {
+            path: dir.to_owned(),
+            source,
+        })?;
+        let path = entry.path();
+        // `file_type` does not follow a symlink, so the walk never leaves `dir`.
+        let is_dir = entry
+            .file_type()
             .map_err(|source| Error::Read {
-                path: dir.to_owned(),
+                path: path.clone(),
                 source,
             })?
-            .path();
-        if path.is_dir() {
+            .is_dir();
+        if is_dir {
             files.extend(markdown_files(&path)?);
         } else if path.extension().is_some_and(|ext| ext == "md") {
             files.insert(path);
@@ -156,7 +163,7 @@ fn remove_empty_dirs(dir: &Path) -> Result<()> {
     };
     for entry in entries.flatten() {
         let path = entry.path();
-        if path.is_dir() {
+        if entry.file_type().is_ok_and(|kind| kind.is_dir()) {
             remove_empty_dirs(&path)?;
             if fs::read_dir(&path).is_ok_and(|mut rest| rest.next().is_none()) {
                 fs::remove_dir(&path).map_err(|source| Error::Write { path, source })?;
