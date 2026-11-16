@@ -23,3 +23,5 @@ Read `docs/agents/rust.md` before you change Rust code, and `docs/agents/mcp.md`
 ## Commits
 
 Commit messages follow Conventional Commits with this project's types and scopes. Read `docs/agents/commits.md` before every commit.
+
+The git hooks are in `.githooks/`. After a clone, turn them on: `git config core.hooksPath .githooks`. The pre-commit hook runs `cargo check --workspace` on the staged files, so every commit builds. The commit-msg hook checks the message.
