@@ -13,7 +13,7 @@ History: 53 sessions with the old server, from 2026-11-05 to 2026-11-15.
 | Feature | Status | Detail | Suggestion |
 | --- | --- | --- | --- |
 | `animation_graph` | not yet |  | never used in 53 sessions, suggest: not needed |
-| `api_search` | not yet | [#5](https://github.com/lanka-community/arma-reforger-tools-mcp/issues/5) | used 53 times in 4 of 53 sessions, 0 errors, last 2026-11-15, suggest: port |
+| `api_search` | ported | [tool api_search](../src/api-docs/tools.rs) | used 53 times in 4 of 53 sessions, 0 errors, last 2026-11-15, suggest: port |
 | `asset_search` | not yet |  | used 7 times in 1 of 53 sessions, 0 errors, last 2026-11-15, suggest: port |
 | `building_setup` | not yet |  | never used in 53 sessions, suggest: not needed |
 | `component_search` | not yet |  | never used in 53 sessions, suggest: not needed |

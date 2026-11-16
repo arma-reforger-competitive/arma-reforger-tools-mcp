@@ -9,7 +9,7 @@ use rmcp::{
     transport::stdio,
 };
 
-use crate::{answer_size, wiki};
+use crate::{answer_size, api_docs, wiki};
 
 #[derive(Clone)]
 pub struct Server {
@@ -50,7 +50,7 @@ impl ServerHandler for Server {
 
 /// Serves the Tools of every Capability over stdio until Claude Code closes the connection.
 pub async fn run() -> Result<(), Box<dyn std::error::Error>> {
-    let server = Server::new(wiki::tools()?);
+    let server = Server::new(wiki::tools()? + api_docs::tools()?);
     server.serve(stdio()).await?.waiting().await?;
     Ok(())
 }
