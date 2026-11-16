@@ -44,6 +44,23 @@ pub enum Error {
         source: std::io::Error,
     },
 
+    /// A line of tests/tool-choice/cases.jsonl is not a valid Tool-choice test.
+    BadCase {
+        line: usize,
+        source: serde_json::Error,
+    },
+    /// The `claude` program cannot start.
+    ClaudeNotStarted {
+        source: std::io::Error,
+    },
+    /// A thread that ran Claude Code stopped with a panic.
+    ClaudeRunStopped,
+    /// Too few Tool-choice tests passed.
+    ToolChoiceBelowFloor {
+        passed: usize,
+        total: usize,
+    },
+
     Read {
         path: PathBuf,
         source: std::io::Error,
@@ -111,6 +128,21 @@ impl fmt::Display for Error {
                 "ci cannot start `{step}`: {source}. Install the program (see the \"Development\" \
                  section of README.md)."
             ),
+            Self::BadCase { line, source } => write!(
+                f,
+                "tests/tool-choice/cases.jsonl line {line}: {source}. A line needs \"question\" and \
+                 \"tools\", and can have \"args\"."
+            ),
+            Self::ClaudeNotStarted { source } => write!(
+                f,
+                "Cannot start `claude`: {source}. Install Claude Code and log in."
+            ),
+            Self::ClaudeRunStopped => write!(f, "A Claude Code run stopped with a panic."),
+            Self::ToolChoiceBelowFloor { passed, total } => write!(
+                f,
+                "Only {passed} of {total} Tool-choice tests passed; at least 90 % must pass. Read \
+                 the FAIL lines, then fix the Tool description, the input text, or the Server guide."
+            ),
             Self::Read { path, source } => write!(f, "Cannot read {}: {source}", path.display()),
             Self::Write { path, source } => write!(f, "Cannot write {}: {source}", path.display()),
             Self::Wikitext { title, source } => write!(f, "Page \"{title}\": {source}"),
@@ -130,7 +162,9 @@ impl std::error::Error for Error {
         match self {
             Self::Read { source, .. }
             | Self::Write { source, .. }
-            | Self::CiStepNotStarted { source, .. } => Some(source),
+            | Self::CiStepNotStarted { source, .. }
+            | Self::ClaudeNotStarted { source } => Some(source),
+            Self::BadCase { source, .. } => Some(source),
             Self::Wikitext { source, .. } => Some(source),
             Self::Xml { source, .. } => Some(source),
             Self::XmlEntity { source, .. } => Some(source),
@@ -140,7 +174,9 @@ impl std::error::Error for Error {
             | Self::NoEnginePages { .. }
             | Self::SamePath { .. }
             | Self::BadSelector(_)
-            | Self::CiStepFailed { .. } => None,
+            | Self::CiStepFailed { .. }
+            | Self::ClaudeRunStopped
+            | Self::ToolChoiceBelowFloor { .. } => None,
         }
     }
 }

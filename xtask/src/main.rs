@@ -8,6 +8,7 @@ mod doxygen;
 mod error;
 mod import;
 mod knowledge;
+mod tool_choice;
 mod wiki_export;
 mod wikitext;
 
@@ -26,6 +27,7 @@ fn main() -> ExitCode {
         SubCmd::Ci => ci::run(),
         SubCmd::Import(ImportArgs { export_list: true }) => import::print_export_steps(),
         SubCmd::Import(ImportArgs { export_list: false }) => import::run(),
+        SubCmd::ToolChoice(args) => tool_choice::run(&args),
     };
     match result {
         Ok(()) => ExitCode::SUCCESS,
