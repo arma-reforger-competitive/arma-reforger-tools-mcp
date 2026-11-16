@@ -2,6 +2,18 @@
 
 A Claude Code plugin for Arma Reforger modding: an MCP server for Capabilities, skills for Know-how. See `GLOSSARY.md` for the words and `docs/adr/` for the decisions.
 
+## Where things are
+
+- `src/`: the MCP server. `server.rs` lists the Tools of every Capability. `answer_size.rs` cuts long answers. Read `server.rs` before you add a Capability.
+- `src/<capability>/` (`wiki/`, `api-docs/`, `game-files/`): one Capability each: its Tools, logic, tests, and a `README.md`. Read the folder's `README.md` before you change a Tool (ADR-0004).
+- `src/wiki/pages/` and `src/api-docs/classes.jsonl`: the Knowledge base. `cargo xtask import` writes them from the Workbench docs and `src/wiki/source/export.xml`, which the owner saves from the wiki (ADR-0005). To change them, run the import.
+- `tests/`: tests that start the real program (`server.rs`) or check the Knowledge base files (`knowledge_base.rs`).
+- `xtask/`: developer commands: `cargo xtask ci` runs every check, `cargo xtask import` rebuilds the Knowledge base. Read it before you change a check or the import.
+- `lint/ast-grep/`: the check that stops a `String` used as an error. Read it when `cargo xtask ci` fails at an `ast-grep` step.
+- `docs/adr/`: the decisions and why. `docs/agents/`: the rules for Rust code, Tools, and commits. `docs/port-ledger.md` and `docs/build-log.md`: what is ported and what changed. `docs/sources/`: read-only research copies.
+- `.claude/skills/`: Developer skills of this repo (`port-status`). `.claude-plugin/`: the plugin manifest.
+- `.githooks/`: the pre-commit and commit-msg hooks. `.github/workflows/`: CI, which runs `cargo xtask ci`.
+
 ## Porting
 
 This repo is built by porting Capabilities from the old enfusion-mcp project (ADR-0001). The old project is at `/home/yevhenii/www/arma-enfusion-mcp` (GitHub: `lanka-community/arma-enfusion-mcp`). Treat it as read-only reference.
