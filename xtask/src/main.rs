@@ -2,6 +2,7 @@
 
 // region:    --- Modules
 
+mod ci;
 mod cmd;
 mod doxygen;
 mod error;
@@ -22,6 +23,7 @@ use cmd::{Cmd, ImportArgs, SubCmd};
 
 fn main() -> ExitCode {
     let result = match Cmd::parse().command {
+        SubCmd::Ci => ci::run(),
         SubCmd::Import(ImportArgs { export_list: true }) => import::print_export_steps(),
         SubCmd::Import(ImportArgs { export_list: false }) => import::run(),
     };

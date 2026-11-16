@@ -33,15 +33,28 @@ claude plugin install reforger@reforger-local
 ## Development
 
 ```sh
-cargo fmt                                                # fix the format
-cargo clippy --workspace --all-targets -- -D warnings    # find code problems
-cargo test --workspace                                   # run all tests
-cargo xtask import                                       # rebuild the Knowledge base after a game update
+cargo fmt             # fix the format
+cargo xtask ci        # run every check of CI, in the same order
+cargo xtask import    # rebuild the Knowledge base after a game update
 ```
+
+`cargo xtask ci` runs these checks in this order and stops at the first failure. CI runs `cargo xtask ci` on every push and pull request. When you add a check, add it here and to `STEPS` in [`xtask/src/ci.rs`](xtask/src/ci.rs).
+
+```sh
+cargo fmt --check
+ast-grep test -c lint/ast-grep/sgconfig.yml --skip-snapshot-tests
+ast-grep scan -c lint/ast-grep/sgconfig.yml src
+cargo clippy --workspace --all-targets -- -D warnings
+cargo test --workspace
+node --test .claude/skills/port-status/port-status.test.ts
+cargo deny --workspace check
+```
+
+The checks need `ast-grep`, `cargo-deny`, and Node 24. Install the first two with `cargo install --locked ast-grep cargo-deny`. `ast-grep` stops a `String` used as an error. Its rule is in [`lint/ast-grep/`](lint/ast-grep/).
 
 `cargo xtask import` needs the Workbench docs of Arma Reforger Tools. [`src/wiki/README.md`](src/wiki/README.md) has the steps.
 
-CI runs the same checks, with `cargo fmt --check`, on every push and pull request. Each Capability has its own folder in `src/`. The rules for Rust code are in [`docs/agents/rust.md`](docs/agents/rust.md), and the rules for Tools are in [`docs/agents/mcp.md`](docs/agents/mcp.md).
+Each Capability has its own folder in `src/`. The rules for Rust code are in [`docs/agents/rust.md`](docs/agents/rust.md), and the rules for Tools are in [`docs/agents/mcp.md`](docs/agents/mcp.md).
 
 ## Learn more
 
