@@ -2,11 +2,12 @@
 
 use rmcp::model::{CallToolResult, ContentBlock};
 
-/// Claude Code cuts Tool answers longer than about 25,000 tokens, which is about 100,000 characters.
+/// Claude Code cuts a Tool answer at about 25,000 tokens. That is about 100,000 characters.
 const MAX_CHARS: usize = 100_000;
 
 /// Cuts `result` at 100,000 characters, counted over all its text blocks. A cut answer ends with
-/// "(Cut at 100,000 of N characters.)", and the blocks after the cut are left out.
+/// "(Cut at 100,000 of N characters.)". The blocks after the cut are left out, also the blocks
+/// that are not text.
 pub fn cut(mut result: CallToolResult) -> CallToolResult {
     let total: usize = result
         .content
@@ -43,6 +44,8 @@ pub fn cut(mut result: CallToolResult) -> CallToolResult {
     result
 }
 
+// region:    --- Support
+
 /// Writes 164192 as "164,192".
 fn with_commas(number: usize) -> String {
     let digits = number.to_string();
@@ -55,6 +58,8 @@ fn with_commas(number: usize) -> String {
     }
     text
 }
+
+// endregion: --- Support
 
 // region:    --- Tests
 
@@ -104,17 +109,56 @@ mod tests {
     }
 
     #[test]
+    fn puts_the_note_on_a_block_that_ends_at_100_000_characters_and_leaves_out_the_rest() {
+        // -- Setup & Fixtures
+        let answer = CallToolResult::success(vec![
+            ContentBlock::text("a".repeat(100_000)),
+            ContentBlock::image("aW1hZ2U=", "image/png"),
+            ContentBlock::text("b"),
+        ]);
+
+        // -- Exec
+        let cut_answer = cut(answer);
+
+        // -- Check
+        let expected = format!(
+            "{}\n\n(Cut at 100,000 of 100,001 characters.)",
+            "a".repeat(100_000)
+        );
+        assert_eq!(
+            cut_answer.content,
+            [ContentBlock::text(expected)],
+            "the image and the text after the cut must be left out"
+        );
+    }
+
+    #[test]
+    fn counts_and_cuts_characters_not_bytes() {
+        // -- Setup & Fixtures
+        let answer = CallToolResult::success(vec![ContentBlock::text("é".repeat(100_001))]);
+
+        // -- Exec
+        let cut_answer = cut(answer);
+
+        // -- Check
+        let text = &cut_answer.content[0].as_text().unwrap().text;
+        let expected = format!(
+            "{}\n\n(Cut at 100,000 of 100,001 characters.)",
+            "é".repeat(100_000)
+        );
+        assert_eq!(*text, expected);
+    }
+
+    #[test]
     fn keeps_the_error_flag_of_a_cut_answer() {
         // -- Setup & Fixtures
-        let answer = CallToolResult::error(vec![ContentBlock::text("é".repeat(100_001))]);
+        let answer = CallToolResult::error(vec![ContentBlock::text("a".repeat(100_001))]);
 
         // -- Exec
         let cut_answer = cut(answer);
 
         // -- Check
         assert_eq!(cut_answer.is_error, Some(true));
-        let text = &cut_answer.content[0].as_text().unwrap().text;
-        assert!(text.ends_with("é\n\n(Cut at 100,000 of 100,001 characters.)"));
     }
 }
 
