@@ -5,7 +5,8 @@ use std::process::Command;
 
 use crate::{Error, Result};
 
-/// Keep this list the same as the checks in the "Development" section of `README.md`.
+/// The checks in the "Development" section of `README.md`, in the same order. A test below
+/// fails when the two lists differ.
 const STEPS: &[&str] = &[
     "cargo fmt --check",
     "ast-grep test -c lint/ast-grep/sgconfig.yml --skip-snapshot-tests",
@@ -36,3 +37,33 @@ pub fn run() -> Result<()> {
     eprintln!("\nci: all {} steps passed.", STEPS.len());
     Ok(())
 }
+
+// region:    --- Tests
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn runs_the_same_checks_as_the_list_in_the_readme() {
+        // -- Setup & Fixtures
+        let readme = include_str!("../../README.md");
+        let after_intro = readme
+            .split_once("runs these checks in this order")
+            .expect("README.md has the sentence before the check list")
+            .1;
+        let block = after_intro
+            .split_once("```sh\n")
+            .and_then(|(_, rest)| rest.split_once("```"))
+            .expect("README.md has an sh block after that sentence")
+            .0;
+
+        // -- Exec
+        let readme_steps: Vec<&str> = block.lines().collect();
+
+        // -- Check
+        assert_eq!(readme_steps, STEPS);
+    }
+}
+
+// endregion: --- Tests
