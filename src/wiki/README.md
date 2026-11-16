@@ -43,6 +43,6 @@ Do not edit the files in `pages/` by hand. Rebuild them:
 1. Set `REFORGER_WORKBENCH_DOCS` to the docs folder of Arma Reforger Tools, for example `/mnt/d/Games/steamapps/common/Arma Reforger Tools/Workbench/docs`.
 2. Renew `source/export.xml`. The wiki answers 403 to scripts, so save it in a browser: `cargo xtask import --export-list` prints the steps and the page list.
 3. Run `cargo xtask import`. It rewrites `pages/` and `../api-docs/classes.jsonl`, and changes only the files whose text changed. A second run changes no file.
-4. Run `cargo test`. `tests/knowledge_base.rs` holds the page and class counts: change them when the game added or removed pages.
+4. Run `cargo nextest run`. `tests/knowledge_base.rs` holds the page and class counts: change them when the game added or removed pages.
 
 The converter is in `xtask/src/wikitext/`. A template that it does not know stops the import with the template name, so add the new template to `render` in `templates.rs`.

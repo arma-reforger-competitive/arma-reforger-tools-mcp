@@ -45,12 +45,12 @@ cargo fmt --check
 ast-grep test -c lint/ast-grep/sgconfig.yml --skip-snapshot-tests
 ast-grep scan -c lint/ast-grep/sgconfig.yml src
 cargo clippy --workspace --all-targets -- -D warnings
-cargo test --workspace
+cargo nextest run --workspace --profile ci
 node --test .claude/skills/port-status/port-status.test.ts
 cargo deny --workspace check
 ```
 
-The checks need `ast-grep`, `cargo-deny`, and Node 24. Install the first two with `cargo install --locked ast-grep cargo-deny`. `ast-grep` stops a `String` used as an error. Its rule is in [`lint/ast-grep/`](lint/ast-grep/).
+The checks need `ast-grep`, `cargo-deny`, `cargo-nextest`, and Node 24. Install the first three with `cargo install --locked ast-grep cargo-deny cargo-nextest`. `cargo-nextest` runs the tests. Its settings are in [`.config/nextest.toml`](.config/nextest.toml). `ast-grep` stops a `String` used as an error. Its rule is in [`lint/ast-grep/`](lint/ast-grep/).
 
 `cargo xtask import` needs the Workbench docs of Arma Reforger Tools. [`src/wiki/README.md`](src/wiki/README.md) has the steps.
 

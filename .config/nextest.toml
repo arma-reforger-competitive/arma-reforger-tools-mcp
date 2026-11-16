@@ -1,0 +1,9 @@
+# cargo-nextest (https://nexte.st) runs each test in its own process.
+# `cargo xtask ci` and CI run `cargo nextest run --workspace --profile ci`.
+[profile.ci]
+# Run all tests after a failure, so one run shows every failure.
+fail-fast = false
+# Say SLOW after 60 s, and stop a test that hangs after 10 periods (10 minutes).
+slow-timeout = { period = "60s", terminate-after = 10 }
+# Print the output of a failure at once, and again at the end of the log.
+failure-output = "immediate-final"

@@ -11,7 +11,7 @@ const STEPS: &[&str] = &[
     "ast-grep test -c lint/ast-grep/sgconfig.yml --skip-snapshot-tests",
     "ast-grep scan -c lint/ast-grep/sgconfig.yml src",
     "cargo clippy --workspace --all-targets -- -D warnings",
-    "cargo test --workspace",
+    "cargo nextest run --workspace --profile ci",
     "node --test .claude/skills/port-status/port-status.test.ts",
     "cargo deny --workspace check",
 ];
