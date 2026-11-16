@@ -20,6 +20,10 @@ _Avoid_: Template (in the game sense), blueprint
 A map with all the Entities placed on it.
 _Avoid_: Level, terrain (terrain is only the ground)
 
+**GUID**:
+The unique id of a mod or of one resource in a mod, written as 16 hex characters. A mod's GUID is also its ID on the Workshop.
+_Avoid_: UUID, ID (alone), hash
+
 **Scenario Framework**:
 The built-in Reforger system for building missions from areas, layers, slots, and actions with little or no script code.
 
