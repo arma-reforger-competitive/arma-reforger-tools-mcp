@@ -72,8 +72,9 @@ pub(super) fn search(pages: &Pages, index: &Index, input: &SearchInput) -> CallT
         let Some(section) = page.sections.get(hit.place.section) else {
             continue;
         };
+        // `wiki_read` has no Section name for the text before the first heading.
         let path = if section.path.is_empty() {
-            "(the text before the first heading)".to_owned()
+            "(the top of the page: read the page without `section`)".to_owned()
         } else {
             section.path_text()
         };
@@ -439,6 +440,20 @@ mod tests {
         assert!(answer.text.contains(
             "Arma Reforger:Server Config\n   Section: game > mods > modID\n   GUID of the mod."
         ));
+    }
+
+    #[tokio::test]
+    async fn says_to_read_the_whole_page_when_the_best_text_is_above_the_first_heading() {
+        // -- Setup & Fixtures
+        let client = connect().await;
+
+        // -- Exec
+        let answer = search(&client, json!({ "query": "airbase" })).await;
+
+        // -- Check
+        assert!(answer.text.contains(
+            "1. Arma Reforger:Arland\n   Section: (the top of the page: read the page without `section`)\n   Although remote"
+        ), "{}", answer.text);
     }
 
     #[tokio::test]

@@ -4,7 +4,7 @@ Reads pages of the Arma Reforger wiki and the Enfusion engine pages from the Kno
 
 ## Tools
 
-- `wiki_search`: finds pages by words, for example `server config` or `faction spawn points`. Each result gives the page title, the path of its best Section (for example `game > mods`), and a short text from it. Each page shows once. `limit` sets how many pages come back, from 1 to 10 (default 5). If no page matches, the answer says what to try next.
+- `wiki_search`: finds pages by words, for example `server config` or `faction spawn points`. Each result gives the page title, the path of its best Section (for example `game > mods`), and a short text from it. Each page shows once. When the best text is above the first heading, the result says to read the page without `section`. `limit` sets how many pages come back, from 1 to 10 (default 5). If no page matches, the answer says what to try next.
 - `wiki_read`: returns the full text of one page by its title, for example `Arma Reforger:Mod Project Setup` or `Event System`. Capital letters do not matter, and underscores from a wiki URL count as spaces. If no page has the title, the answer lists the 3 closest real titles. An empty title gives an error with an example title. Pages longer than 100,000 characters are cut.
   - `section` returns only one Section: a heading name (`mods`) or a path (`game > password`). When a heading name ends more than one path, the answer is an error that lists the full paths. Paths that differ only in capital letters count as one path. When no Section has the name, the error lists all Sections of the page.
 
