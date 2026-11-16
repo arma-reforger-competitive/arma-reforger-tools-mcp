@@ -14,7 +14,7 @@ A Port is done when all five checks pass:
 2. Each new Tool gives the expected answers in MCP Inspector: `npx -y @modelcontextprotocol/inspector@2.15.0 --cli target/release/reforger --method tools/call --tool-name <tool> --tool-arg <name>=<value>`. Run `cargo build --release` first.
 3. One real question uses the new Tools and gets a correct answer: `claude -p "<question>" --allowedTools "mcp__plugin_reforger_reforger__<tool>"`.
 4. `docs/build-log.md` has a 3-5 line entry: what was ported, what changed from the old code, and why.
-5. The Port's rows in the Port ledger are marked "ported": `node .claude/skills/port-status/port-status.ts set ported <old feature> --tool <new tool>`.
+5. The Port's rows in the Port ledger are marked "ported": `node .claude/skills/port-status/port-status.ts set ported <old feature> --tool <new tool>`. The agent sets this itself, in the Port's PR, when checks 1-4 pass and the ticket has no work left.
 
 ## Code
 
