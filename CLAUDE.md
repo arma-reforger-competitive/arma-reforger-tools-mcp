@@ -12,7 +12,7 @@ A Claude Code plugin for Arma Reforger modding: an MCP server for Capabilities, 
 - `lint/ast-grep/`: the check that stops a `String` used as an error. Read it when `cargo xtask ci` fails at an `ast-grep` step.
 - `docs/adr/`: the decisions and why. `docs/agents/`: the rules for Rust code, Tools, and commits. `docs/port-ledger.md` and `docs/build-log.md`: what is ported and what changed. `docs/sources/`: read-only research copies.
 - `.claude/skills/`: Developer skills of this repo (`port-status`). `.claude-plugin/`: the plugin manifest.
-- `.githooks/`: the pre-commit and commit-msg hooks. `.github/workflows/`: CI, which runs `cargo xtask ci`.
+- `.githooks/`: the pre-commit and commit-msg hooks. `.github/workflows/`: CI, which runs `cargo xtask ci`. `.config/nextest.toml`: the settings of the test runner.
 
 ## Porting
 

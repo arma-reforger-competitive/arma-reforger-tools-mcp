@@ -232,7 +232,7 @@ async fn asks_for_a_name_when_the_query_is_empty() {
 }
 
 /// Needs the game: set `REFORGER_GAME_PATH` to the game folder in WSL form, then run
-/// `cargo test -- --ignored`.
+/// `cargo nextest run --run-ignored only`.
 #[tokio::test]
 #[ignore = "needs the installed game"]
 async fn finds_the_camera_handler_script_in_the_installed_game_by_a_windows_and_a_wsl_path() {
