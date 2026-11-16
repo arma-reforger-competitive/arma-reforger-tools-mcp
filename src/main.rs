@@ -12,5 +12,11 @@ mod test_support;
 
 #[tokio::main(flavor = "current_thread")]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    // Logs go to stderr, because stdout carries the MCP messages. Claude Code saves them in
+    // ~/.cache/claude-cli-nodejs/<project>/mcp-logs-plugin-reforger-reforger/.
+    tracing_subscriber::fmt()
+        .with_writer(std::io::stderr)
+        .with_max_level(tracing_subscriber::filter::LevelFilter::INFO)
+        .init();
     server::run().await
 }

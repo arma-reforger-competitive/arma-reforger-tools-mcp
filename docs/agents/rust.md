@@ -26,6 +26,11 @@ The `rmcp` API changes between versions. Copy from the working code here before 
 
 - The server runs on one thread. Do blocking work, for example reading `.pak` files or a long search, in `tokio::task::spawn_blocking`, so that the other Tools still answer.
 
+## Logs
+
+- The server writes logs to stderr at the INFO level (`src/main.rs`). rmcp logs the start, each notification, each cancel, and the stop. Claude Code saves the logs in `~/.cache/claude-cli-nodejs/<project>/mcp-logs-plugin-reforger-reforger/`.
+- To log from a Tool, add the `tracing` crate and use `tracing::info!` or `tracing::warn!`. Never print to stdout: it carries the MCP messages. A test in `tests/server.rs` fails when a log line goes to stdout.
+
 ## Tests
 
 - Test a Capability through its public `tools()` function: serve it with `test_support::connect`, call the Tool with `test_support::call`, and check the text and `is_error`. Example: the tests in `src/wiki/read.rs`.

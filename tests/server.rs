@@ -3,8 +3,9 @@ use rmcp::{
     model::{CallToolRequestParams, ClientConfig},
     transport::TokioChildProcess,
 };
-use serde_json::json;
-use tokio::process::Command;
+use serde_json::{Value, json};
+use std::process::Stdio;
+use tokio::{io::AsyncWriteExt, process::Command};
 
 #[tokio::test]
 async fn starts_the_reforger_server_over_stdio_and_answers_wiki_read() {
@@ -68,4 +69,52 @@ async fn describes_every_tool_and_every_tool_input() {
     }
 
     client.cancel().await.unwrap();
+}
+
+#[tokio::test]
+async fn writes_logs_to_stderr_and_only_mcp_messages_to_stdout() {
+    // -- Setup & Fixtures
+    let mut server = Command::new(env!("CARGO_BIN_EXE_reforger"))
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()
+        .unwrap();
+    let initialize = json!({
+        "jsonrpc": "2.0",
+        "id": 1,
+        "method": "initialize",
+        "params": {
+            "protocolVersion": "2025-06-18",
+            "capabilities": {},
+            "clientInfo": { "name": "test", "version": "0.0.0" }
+        }
+    });
+    let initialized = json!({ "jsonrpc": "2.0", "method": "notifications/initialized" });
+
+    // -- Exec
+    let mut stdin = server.stdin.take().unwrap();
+    stdin
+        .write_all(format!("{initialize}\n{initialized}\n").as_bytes())
+        .await
+        .unwrap();
+    drop(stdin);
+    let output = server.wait_with_output().await.unwrap();
+
+    // -- Check
+    let stdout = String::from_utf8(output.stdout).unwrap();
+    let stderr = String::from_utf8(output.stderr).unwrap();
+    assert!(!stdout.trim().is_empty(), "the server did not answer");
+    for line in stdout.lines() {
+        let message: Value = serde_json::from_str(line)
+            .unwrap_or_else(|_| panic!("stdout has a line that is not JSON: {line}"));
+        assert_eq!(
+            message["jsonrpc"], "2.0",
+            "stdout has a line that is not MCP: {line}"
+        );
+    }
+    assert!(
+        stderr.contains("Service initialized as server"),
+        "the rmcp log is not on stderr: {stderr}"
+    );
 }
