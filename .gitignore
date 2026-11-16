@@ -1,2 +1,4 @@
 target/
 .idea/
+tests/.out/
+xtask/tests/.out/

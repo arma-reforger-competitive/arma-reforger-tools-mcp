@@ -7,10 +7,17 @@ license = "MIT"
 repository = "https://github.com/arma-reforger-competitive/arma-reforger-tools-mcp"
 publish = false
 
-[lints.rust]
+# The xtask crate holds developer commands. `cargo build --release` does not build it.
+[workspace]
+members = ["xtask"]
+
+[lints]
+workspace = true
+
+[workspace.lints.rust]
 unsafe_code = "forbid"
 
-[lints.clippy]
+[workspace.lints.clippy]
 pedantic = { level = "warn", priority = -1 }
 unwrap_used = "deny"
 expect_used = "deny"
