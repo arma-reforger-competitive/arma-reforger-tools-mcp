@@ -395,7 +395,7 @@ function main(args: string[]): number {
   if (command === "report") {
     if (!existsSync(join(oldRepo, "src")))
       throw new Error(
-        `The old project is not at ${oldRepo}. Clone git@github.com:arma-reforger-competitive/arma-enfusion-mcp.git there.`,
+        `The old project is not at ${oldRepo}. Clone git@github.com:lanka-community/arma-enfusion-mcp.git there.`,
       );
     const features = inventory(oldRepo);
     const usage = readUsage(historyDir, features);

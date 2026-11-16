@@ -1,20 +1,20 @@
 # Arma Reforger Tools MCP
 
-> **Work in progress.** The plugin installs and has two tools, `wiki_search` and `wiki_read`. Follow the [roadmap](https://github.com/arma-reforger-competitive/arma-reforger-tools-mcp/issues/1) to see what is done and what comes next.
+> **Work in progress.** The plugin installs and has two tools, `wiki_search` and `wiki_read`. Follow the [roadmap](https://github.com/lanka-community/arma-reforger-tools-mcp/issues/1) to see what is done and what comes next.
 
 `reforger` is a Claude Code plugin that helps you learn, build, and fix Arma Reforger mods. It gives Claude two kinds of help:
 
 - **MCP tools** for jobs that need code: searching the Enfusion script API and the Reforger wiki, and finding and reading the game's own files.
 - **Skills** with Reforger know-how: steps, rules, examples, and templates for modding tasks.
 
-This project rebuilds the older [enfusion-mcp](https://github.com/arma-reforger-competitive/arma-enfusion-mcp) step by step, one part at a time.
+This project rebuilds the older [enfusion-mcp](https://github.com/lanka-community/arma-enfusion-mcp) step by step, one part at a time.
 
 ## Install
 
 You need Claude Code and Rust. Install Rust with [rustup](https://rustup.rs/). This repo's `rust-toolchain.toml` names the Rust version, and rustup installs it on the first `cargo` command.
 
 ```sh
-git clone https://github.com/arma-reforger-competitive/arma-reforger-tools-mcp.git
+git clone https://github.com/lanka-community/arma-reforger-tools-mcp.git
 cd arma-reforger-tools-mcp
 cargo build --release
 claude plugin marketplace add ./
