@@ -14,19 +14,21 @@ pub use error::{Error, Result};
 
 // endregion: --- Modules
 
-use std::io::Write as _;
 use std::process::ExitCode;
 
 use clap::Parser as _;
 
+use cmd::{Cmd, ImportArgs, SubCmd};
+
 fn main() -> ExitCode {
-    let result = match cmd::Cmd::parse().command {
-        cmd::SubCmd::Import { export_list } => import::exec(export_list),
+    let result = match Cmd::parse().command {
+        SubCmd::Import(ImportArgs { export_list: true }) => import::print_export_steps(),
+        SubCmd::Import(ImportArgs { export_list: false }) => import::run(),
     };
     match result {
         Ok(()) => ExitCode::SUCCESS,
         Err(err) => {
-            let _ = writeln!(std::io::stderr(), "error: {err}");
+            eprintln!("error: {err}");
             ExitCode::FAILURE
         }
     }

@@ -1,6 +1,6 @@
 //! The command-line arguments.
 
-use clap::{Parser, Subcommand};
+use clap::{Args, Parser, Subcommand};
 
 #[derive(Parser, Debug)]
 #[command(about = "Developer commands of the reforger plugin repo")]
@@ -12,9 +12,12 @@ pub struct Cmd {
 #[derive(Subcommand, Debug)]
 pub enum SubCmd {
     /// Rebuild the Knowledge base from the Workbench docs (`REFORGER_WORKBENCH_DOCS`) and src/wiki/source/export.xml.
-    Import {
-        /// Only print the steps and the page list to save a new export.xml from the wiki.
-        #[arg(long)]
-        export_list: bool,
-    },
+    Import(ImportArgs),
+}
+
+#[derive(Args, Debug)]
+pub struct ImportArgs {
+    /// Only print the steps and the page list to save a new export.xml from the wiki.
+    #[arg(long)]
+    pub export_list: bool,
 }

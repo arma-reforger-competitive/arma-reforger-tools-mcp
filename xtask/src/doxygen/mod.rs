@@ -10,6 +10,6 @@ mod markdown;
 pub use classes::{ApiFolder, read as read_classes};
 pub use engine_pages::read as read_engine_pages;
 
-use html::{read_html, selector};
+use html::{DOCS_URL, parent_row, read_html, selector};
 
 // endregion: --- Modules

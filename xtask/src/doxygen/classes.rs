@@ -5,23 +5,31 @@ use std::fs;
 use std::path::{Path, PathBuf};
 use std::thread;
 
-use scraper::{ElementRef, Html};
+use scraper::{ElementRef, Html, Selector};
 use serde::Serialize;
 
 use super::markdown;
-use super::{read_html, selector};
+use super::{DOCS_URL, parent_row, read_html, selector};
 use crate::{Error, Result};
-
-const DOCS_URL: &str = "https://community.bistudio.com/wikidata/external-data/arma-reforger/";
 
 /// One folder of script API docs.
 pub struct ApiFolder {
-    /// `enfusion` for the engine API, `arma` for the game API.
-    pub source: &'static str,
+    pub source: ApiSource,
     pub html_dir: PathBuf,
 
     /// The folder name on the wiki server, for example `EnfusionScriptAPIPublic`.
     pub public_name: &'static str,
+}
+
+/// Which script API a class belongs to. It is the `source` field in the JSON.
+#[derive(Clone, Copy, Serialize)]
+#[serde(rename_all = "lowercase")]
+pub enum ApiSource {
+    /// The engine API, in `EnfusionScriptAPI`.
+    Enfusion,
+
+    /// The game API, in `ArmaReforgerScriptAPIPublic`.
+    Arma,
 }
 
 /// One class. Empty fields are left out of the JSON.
@@ -29,7 +37,7 @@ pub struct ApiFolder {
 #[serde(rename_all = "camelCase")]
 pub struct Class {
     pub name: String,
-    pub source: &'static str,
+    pub source: ApiSource,
 
     #[serde(skip_serializing_if = "String::is_empty")]
     pub brief: String,
@@ -108,10 +116,12 @@ pub struct Enum {
 }
 
 /// Reads every class of `folder`, sorted by name.
-/// Parents and children come from the class tree in `hierarchy.html`.
+/// Parents and children come from the class tree in `hierarchy.html`. A parent from the other
+/// docs folder has no page here, so the tree gives only its name.
 pub fn read(folder: &ApiFolder) -> Result<Vec<Class>> {
     let files = class_files(&folder.html_dir)?;
     let tree = class_tree(&folder.html_dir)?;
+    let selectors = Selectors::new()?;
     let threads = thread::available_parallelism().map_or(4, usize::from);
     let chunk_size = files.len().div_ceil(threads).max(1);
     let mut classes = thread::scope(|scope| {
@@ -121,7 +131,7 @@ pub fn read(folder: &ApiFolder) -> Result<Vec<Class>> {
                 scope.spawn(|| {
                     chunk
                         .iter()
-                        .map(|file| read_class(folder, file))
+                        .map(|file| read_class(folder, &selectors, file))
                         .collect::<Result<Vec<_>>>()
                 })
             })
@@ -145,7 +155,10 @@ pub fn read(folder: &ApiFolder) -> Result<Vec<Class>> {
         class.parents = tree
             .parent
             .get(file)
-            .and_then(name_of)
+            .and_then(|parent| match parent {
+                TreeClass::File(file) => name_of(file),
+                TreeClass::Name(name) => Some(name.clone()),
+            })
             .into_iter()
             .collect();
         class.children = tree
@@ -165,6 +178,31 @@ pub fn read(folder: &ApiFolder) -> Result<Vec<Class>> {
     Ok(classes)
 }
 
+impl ApiFolder {
+    /// The engine API folder under the Workbench `docs` folder.
+    pub fn enfusion(docs: &Path) -> Self {
+        Self {
+            source: ApiSource::Enfusion,
+            html_dir: docs.join("EnfusionScriptAPI/html"),
+            public_name: "EnfusionScriptAPIPublic",
+        }
+    }
+
+    /// The game API folder under the Workbench `docs` folder.
+    pub fn arma(docs: &Path) -> Self {
+        Self {
+            source: ApiSource::Arma,
+            html_dir: docs.join("ArmaReforgerScriptAPIPublic/html"),
+            public_name: "ArmaReforgerScriptAPIPublic",
+        }
+    }
+
+    /// The public URL of a file in this folder.
+    pub fn url(&self, file: &str) -> String {
+        format!("{DOCS_URL}{}/{file}", self.public_name)
+    }
+}
+
 // region:    --- Support
 
 /// The class pages: `interface<Name>.html`, without the `-members.html` lists. Basic types such as
@@ -174,32 +212,48 @@ fn class_files(html_dir: &Path) -> Result<Vec<String>> {
         path: html_dir.to_owned(),
         source,
     })?;
-    let mut files: Vec<String> = entries
-        .filter_map(|entry| entry.ok()?.file_name().into_string().ok())
-        .filter(|name| {
-            name.strip_prefix("interface")
+    let mut files = Vec::new();
+    for entry in entries {
+        let entry = entry.map_err(|source| Error::Read {
+            path: html_dir.to_owned(),
+            source,
+        })?;
+        if let Ok(name) = entry.file_name().into_string()
+            && name
+                .strip_prefix("interface")
                 .is_some_and(|rest| rest.starts_with(|c: char| c.is_ascii_alphabetic()))
-                && Path::new(name)
-                    .extension()
-                    .is_some_and(|ext| ext.eq_ignore_ascii_case("html"))
-                && !name.ends_with("-members.html")
-        })
-        .collect();
+            && Path::new(&name)
+                .extension()
+                .is_some_and(|ext| ext.eq_ignore_ascii_case("html"))
+            && !name.ends_with("-members.html")
+        {
+            files.push(name);
+        }
+    }
     files.sort();
     Ok(files)
 }
 
-/// The class tree, by file name: each class's parent and children.
+/// The class tree: each class's parent and children. Classes with a page are named by file name.
 struct ClassTree {
-    parent: HashMap<String, String>,
+    parent: HashMap<String, TreeClass>,
     children: BTreeMap<String, Vec<String>>,
+}
+
+/// A class in `hierarchy.html`. A class with a page in this folder is a link to its file. A class
+/// from the other docs folder, for example `ScriptComponent` in the game docs, is only a bold name.
+#[derive(Clone)]
+enum TreeClass {
+    File(String),
+    Name(String),
 }
 
 fn class_tree(html_dir: &Path) -> Result<ClassTree> {
     let document = read_html(&html_dir.join("hierarchy.html"))?;
     let link = selector("td.entry a.el")?;
-    let mut by_row: HashMap<String, String> = HashMap::new();
-    let mut rows = Vec::new();
+    let bold = selector("td.entry b")?;
+    let mut by_row: HashMap<String, TreeClass> = HashMap::new();
+    let mut files = Vec::new();
     for row in document.select(&selector("tr[id^=\"row_\"]")?) {
         let id = row.value().attr("id").unwrap_or_default().to_owned();
         let file = row
@@ -208,36 +262,36 @@ fn class_tree(html_dir: &Path) -> Result<ClassTree> {
             .and_then(|anchor| anchor.value().attr("href"))
             .map(|href| href.split('#').next().unwrap_or(href).to_owned());
         if let Some(file) = file {
-            by_row.insert(id.clone(), file.clone());
-            rows.push((id, file));
+            by_row.insert(id.clone(), TreeClass::File(file.clone()));
+            files.push((id, file));
+        } else if let Some(name) = row.select(&bold).next().map(markdown::text) {
+            by_row.insert(id, TreeClass::Name(name));
         }
     }
     let mut tree = ClassTree {
         parent: HashMap::new(),
         children: BTreeMap::new(),
     };
-    for (id, file) in rows {
-        let parent = id
-            .strip_suffix('_')
-            .and_then(|trimmed| trimmed.rsplit_once('_'))
-            .map(|(parent, _)| format!("{parent}_"))
-            .and_then(|parent| by_row.get(&parent));
-        if let Some(parent) = parent {
-            tree.parent.insert(file.clone(), parent.clone());
+    for (id, file) in files {
+        let Some(parent) = parent_row(&id).and_then(|parent| by_row.get(&parent)) else {
+            continue;
+        };
+        if let TreeClass::File(parent) = parent {
             let children = tree.children.entry(parent.clone()).or_default();
             if !children.contains(&file) {
-                children.push(file);
+                children.push(file.clone());
             }
         }
+        tree.parent.insert(file, parent.clone());
     }
     Ok(tree)
 }
 
-fn read_class(folder: &ApiFolder, file: &str) -> Result<(String, Class)> {
+fn read_class(folder: &ApiFolder, selectors: &Selectors, file: &str) -> Result<(String, Class)> {
     let document = read_html(&folder.html_dir.join(file))?;
     // The title holds the group links too, so only its own text is the name.
     let name: String = document
-        .select(&selector("div.headertitle div.title")?)
+        .select(&selectors.title)
         .next()
         .map_or_default(|title| {
             title
@@ -251,23 +305,25 @@ fn read_class(folder: &ApiFolder, file: &str) -> Result<(String, Class)> {
         .trim_end_matches(" Class Reference")
         .to_owned();
     let brief = document
-        .select(&selector("div.contents > p")?)
+        .select(&selectors.brief)
         .next()
         .map_or_default(markdown::inline)
         .trim_end_matches("More...")
         .trim()
         .to_owned();
     let description = document
-        .select(&selector("div.contents > div.textblock")?)
+        .select(&selectors.description)
         .next()
         .map_or_default(|block| markdown::blocks(block, 2));
-    let description = if description == brief {
-        String::new()
-    } else {
-        description
+    // The description often starts with the brief again.
+    let description = match description.strip_prefix(&brief) {
+        Some(rest) if !brief.is_empty() && (rest.is_empty() || rest.starts_with('\n')) => {
+            rest.trim_start().to_owned()
+        }
+        _ => description,
     };
     let group = document
-        .select(&selector("div.ingroups a.el")?)
+        .select(&selectors.group)
         .next()
         .map_or_default(markdown::text);
     let mut class = Class {
@@ -278,7 +334,7 @@ fn read_class(folder: &ApiFolder, file: &str) -> Result<(String, Class)> {
         parents: Vec::new(),
         children: Vec::new(),
         group,
-        source_file: source_file(&document)?,
+        source_file: source_file(&document, selectors),
         methods: Vec::new(),
         protected_methods: Vec::new(),
         static_methods: Vec::new(),
@@ -286,32 +342,29 @@ fn read_class(folder: &ApiFolder, file: &str) -> Result<(String, Class)> {
         properties: Vec::new(),
         protected_properties: Vec::new(),
         enums: Vec::new(),
-        docs_url: format!("{DOCS_URL}{}/{file}", folder.public_name),
+        docs_url: folder.url(file),
     };
-    add_members(&document, &mut class)?;
+    add_members(&document, selectors, &mut class);
     Ok((file.to_owned(), class))
 }
 
-/// Doxygen ends a class page with "generated from the following file:" and a list with the file.
-fn source_file(document: &Html) -> Result<String> {
-    Ok(document
-        .select(&selector("div.contents > ul > li")?)
+/// The last item of the list at the end of the page: the file that the class comes from.
+fn source_file(document: &Html, selectors: &Selectors) -> String {
+    document
+        .select(&selectors.source_file)
         .next_back()
-        .map_or_default(markdown::text))
+        .map_or_default(markdown::text)
 }
 
 /// Reads the member tables at the top of the page. Rows that a class inherits are left out:
 /// the parent class has them.
-fn add_members(document: &Html, class: &mut Class) -> Result<()> {
-    let docs = member_docs(document)?;
-    let left = selector("td.memItemLeft")?;
-    let right = selector("td.memItemRight")?;
-    let link = selector("a.el")?;
+fn add_members(document: &Html, selectors: &Selectors, class: &mut Class) {
+    let docs = member_docs(document, selectors);
     let mut section = String::new();
-    for row in document.select(&selector("table.memberdecls tr")?) {
+    for row in document.select(&selectors.member_row) {
         let classes = row.value().attr("class").unwrap_or_default();
         if classes == "heading" {
-            if let Some(anchor) = row.select(&selector("a[id]")?).next() {
+            if let Some(anchor) = row.select(&selectors.anchor).next() {
                 anchor
                     .value()
                     .attr("id")
@@ -326,15 +379,16 @@ fn add_members(document: &Html, class: &mut Class) -> Result<()> {
         if hash.contains(' ') {
             continue;
         }
-        let (Some(left_cell), Some(right_cell)) =
-            (row.select(&left).next(), row.select(&right).next())
-        else {
+        let (Some(left_cell), Some(right_cell)) = (
+            row.select(&selectors.item_left).next(),
+            row.select(&selectors.item_right).next(),
+        ) else {
             continue;
         };
         let left_text = markdown::text(left_cell);
         let right_text = markdown::text(right_cell);
         let name = right_cell
-            .select(&link)
+            .select(&selectors.link)
             .next()
             .map_or_else(|| right_text.clone(), markdown::text);
         let description = docs.get(hash).cloned().unwrap_or_default();
@@ -364,18 +418,16 @@ fn add_members(document: &Html, class: &mut Class) -> Result<()> {
             _ => {}
         }
     }
-    Ok(())
 }
 
 /// The documentation of each member, by the hash in its row class. The long text below the tables
 /// wins over the one-line text in the table.
-fn member_docs(document: &Html) -> Result<HashMap<String, String>> {
+fn member_docs(document: &Html, selectors: &Selectors) -> HashMap<String, String> {
     let mut docs = HashMap::new();
-    let short = selector("td.mdescRight")?;
-    for row in document.select(&selector("table.memberdecls tr")?) {
+    for row in document.select(&selectors.member_row) {
         let classes = row.value().attr("class").unwrap_or_default();
         if let Some(hash) = classes.strip_prefix("memdesc:")
-            && let Some(cell) = row.select(&short).next()
+            && let Some(cell) = row.select(&selectors.item_description).next()
         {
             let text = markdown::inline(cell);
             if !text.is_empty() {
@@ -383,8 +435,7 @@ fn member_docs(document: &Html) -> Result<HashMap<String, String>> {
             }
         }
     }
-    let memdoc = selector("div.memdoc")?;
-    for item in document.select(&selector("div.memitem")?) {
+    for item in document.select(&selectors.member_item) {
         let anchor = item
             .prev_siblings()
             .filter_map(ElementRef::wrap)
@@ -393,14 +444,138 @@ fn member_docs(document: &Html) -> Result<HashMap<String, String>> {
             continue;
         };
         let text = item
-            .select(&memdoc)
+            .select(&selectors.member_doc)
             .next()
             .map_or_default(|doc| markdown::blocks(doc, 3));
         if !text.is_empty() {
             docs.insert(id.to_owned(), text);
         }
     }
-    Ok(docs)
+    docs
+}
+
+/// The CSS selectors of a class page, made once for all pages.
+struct Selectors {
+    title: Selector,
+    brief: Selector,
+    description: Selector,
+    group: Selector,
+
+    /// Doxygen ends a class page with "generated from the following file:" and a list with the file.
+    source_file: Selector,
+    member_row: Selector,
+    anchor: Selector,
+    item_left: Selector,
+    item_right: Selector,
+    item_description: Selector,
+    link: Selector,
+    member_item: Selector,
+    member_doc: Selector,
+}
+
+impl Selectors {
+    fn new() -> Result<Self> {
+        Ok(Self {
+            title: selector("div.headertitle div.title")?,
+            brief: selector("div.contents > p")?,
+            description: selector("div.contents > div.textblock")?,
+            group: selector("div.ingroups a.el")?,
+            source_file: selector("div.contents > ul > li")?,
+            member_row: selector("table.memberdecls tr")?,
+            anchor: selector("a[id]")?,
+            item_left: selector("td.memItemLeft")?,
+            item_right: selector("td.memItemRight")?,
+            item_description: selector("td.mdescRight")?,
+            link: selector("a.el")?,
+            member_item: selector("div.memitem")?,
+            member_doc: selector("div.memdoc")?,
+        })
+    }
 }
 
 // endregion: --- Support
+
+// region:    --- Tests
+
+#[cfg(test)]
+mod tests {
+    use serde_json::{Value, json};
+
+    use super::*;
+
+    #[test]
+    fn names_a_parent_from_the_other_docs_folder_and_drops_a_repeated_brief() {
+        // -- Setup & Fixtures
+        let dir = Path::new(env!("CARGO_MANIFEST_DIR")).join(
+            "tests/.out/names_a_parent_from_the_other_docs_folder_and_drops_a_repeated_brief",
+        );
+        assert!(dir.to_string_lossy().contains("tests/.out"));
+        let _ = fs::remove_dir_all(&dir);
+        let folder = ApiFolder::arma(&dir);
+        fs::create_dir_all(&folder.html_dir).unwrap();
+        // As in the game docs: `ScriptComponent` is an engine class, so it is bold, not a link.
+        fs::write(
+            folder.html_dir.join("hierarchy.html"),
+            "<table>\
+             <tr id=\"row_0_\"><td class=\"entry\"><b>ScriptComponent</b></td></tr>\
+             <tr id=\"row_0_0_\"><td class=\"entry\"><a class=\"el\" href=\"interfaceSCR_A.html\">SCR_A</a></td></tr>\
+             <tr id=\"row_0_0_0_\"><td class=\"entry\"><a class=\"el\" href=\"interfaceSCR_B.html\">SCR_B</a></td></tr>\
+             </table>",
+        )
+        .unwrap();
+        for (name, brief, description) in [
+            (
+                "SCR_A",
+                "Gives items.",
+                "<p>Gives items.</p><p>Only on the server.</p>",
+            ),
+            ("SCR_B", "Shows items.", "<p>Shows items.</p>"),
+        ] {
+            fs::write(
+                folder.html_dir.join(format!("interface{name}.html")),
+                format!(
+                    "<div class=\"headertitle\"><div class=\"title\">{name} Interface Reference</div></div>\
+                     <div class=\"contents\"><p>{brief} <a href=\"#details\">More...</a></p>\
+                     <div class=\"textblock\">{description}</div>\
+                     <ul><li>Game/{name}.c</li></ul></div>"
+                ),
+            )
+            .unwrap();
+        }
+
+        // -- Exec
+        let classes = read(&folder).unwrap();
+
+        // -- Check
+        let classes: Vec<Value> = classes
+            .iter()
+            .map(|class| serde_json::to_value(class).unwrap())
+            .collect();
+        let url = "https://community.bistudio.com/wikidata/external-data/arma-reforger/ArmaReforgerScriptAPIPublic/";
+        assert_eq!(
+            classes,
+            [
+                json!({
+                    "name": "SCR_A",
+                    "source": "arma",
+                    "brief": "Gives items.",
+                    "description": "Only on the server.",
+                    "parents": ["ScriptComponent"],
+                    "children": ["SCR_B"],
+                    "sourceFile": "Game/SCR_A.c",
+                    "docsUrl": format!("{url}interfaceSCR_A.html"),
+                }),
+                json!({
+                    "name": "SCR_B",
+                    "source": "arma",
+                    "brief": "Shows items.",
+                    "parents": ["SCR_A"],
+                    "sourceFile": "Game/SCR_B.c",
+                    "docsUrl": format!("{url}interfaceSCR_B.html"),
+                }),
+            ]
+        );
+    }
+}
+
+// endregion: --- Tests
