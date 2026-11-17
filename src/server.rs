@@ -22,8 +22,9 @@ files are on this computer, so these Tools answer fast and need no internet.
 
 - `api_search`: classes and methods of the Enfusion and Arma Reforger script API, with \
 signatures and parent classes.
-- `wiki_search`, then `wiki_read`: how-to pages of the Arma Reforger wiki and the Enfusion \
-engine pages.
+- `wiki_search`: find how-to pages of the Arma Reforger wiki and the Enfusion engine pages. \
+`wiki_read`: read one page by its `title`. When the user names the page, call `wiki_read` \
+directly.
 - `game_find`: the scripts, Prefabs, and configs of the game and of the Workshop mods that \
 Workbench downloaded. They are inside .pak archives, so grep, find, and file search cannot see \
 them, and they are not in the project folder.

@@ -102,14 +102,20 @@ async fn names_every_served_tool_and_no_other_in_the_server_guide() {
         .instructions
         .clone()
         .expect("the server sends a Server guide");
-    let mut named: Vec<&str> = guide.split('`').skip(1).step_by(2).collect();
-    let mut served: Vec<String> = client
-        .list_all_tools()
-        .await
-        .unwrap()
-        .into_iter()
-        .map(|tool| tool.name.to_string())
+    let tools = client.list_all_tools().await.unwrap();
+    // The guide can name a Tool input in backticks too, so that Claude uses the right name.
+    let inputs: Vec<&String> = tools
+        .iter()
+        .filter_map(|tool| tool.input_schema.get("properties")?.as_object())
+        .flat_map(|properties| properties.keys())
         .collect();
+    let mut named: Vec<&str> = guide
+        .split('`')
+        .skip(1)
+        .step_by(2)
+        .filter(|word| !inputs.iter().any(|input| input.as_str() == *word))
+        .collect();
+    let mut served: Vec<String> = tools.iter().map(|tool| tool.name.to_string()).collect();
 
     // -- Check
     named.sort_unstable();
