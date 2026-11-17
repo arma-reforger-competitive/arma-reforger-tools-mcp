@@ -1,6 +1,6 @@
 # Arma Reforger Tools MCP
 
-> **Work in progress.** The plugin installs and has the five tools below. Follow the [roadmap](https://github.com/lanka-community/arma-reforger-tools-mcp/issues/1) to see what is done and what comes next.
+> **Work in progress.** The plugin installs and has the six tools below. Follow the [roadmap](https://github.com/lanka-community/arma-reforger-tools-mcp/issues/1) to see what is done and what comes next.
 
 `reforger` is a Claude Code plugin that helps you learn, build, and fix Arma Reforger mods. It gives Claude two kinds of help:
 
@@ -29,11 +29,12 @@ claude plugin install reforger@reforger-local
 | ------------------ | -------------------------------------------------------------------------------------------------------------- |
 | `api_search`       | Finds classes and methods of the Enfusion and Arma Reforger script API, with signatures and parent classes.    |
 | `wiki_search`      | Finds wiki pages and engine pages by words, with the best Section of each.                                     |
-| `wiki_read`        | Returns one Arma Reforger wiki page or Enfusion engine page by its title, or one Section of it.               |
+| `wiki_read`        | Returns one Arma Reforger wiki page or Enfusion engine page by its title, or one Section of it.                |
 | `game_find`        | Finds the scripts, Prefabs, and configs inside the `.pak` files of the game and of downloaded Workshop mods.   |
 | `workbench_status` | Checks the connection to a running Workbench, copies the Handler script into the open mod, and names that mod. |
+| `workbench_launch` | Starts Workbench with one of your mods open, finds it through Steam, and waits until the scripts are compiled. |
 
-`game_find` and `workbench_status` need settings. Their READMEs list them: [`src/game-files/README.md`](src/game-files/README.md) and [`src/workbench/README.md`](src/workbench/README.md).
+`game_find` and the Workbench tools need settings. Their READMEs list them: [`src/game-files/README.md`](src/game-files/README.md) and [`src/workbench/README.md`](src/workbench/README.md).
 
 ## Development
 

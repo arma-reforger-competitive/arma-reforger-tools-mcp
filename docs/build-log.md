@@ -48,3 +48,10 @@
 - Not ported: the start of Workbench, the 30-second poll for a recompile, and the dependency links (ADR 0009). After a copy, the bridge calls the built-in `ReloadScripts` once. A test on Workbench 1.6 showed that it loads a new or changed Handler script with no restart.
 - Changed: the bridge finds the open mod from `GetLoadedProjects` and the project list of Workbench in Documents. The old code guessed it from a project folder setting. Every answer of the Handler script has its version, so an old copy is replaced.
 - Pack test: Workbench packs the Handler script into the mod (`data.pak` of BridgeTest held `Scripts/WorkbenchGame/ReforgerBridge/ReforgerBridge.c`), and has no setting to leave a folder out. The README says to delete the folder before a pack and gives the `.gitignore` line.
+
+## workbench_launch (#61)
+
+- Ported the start of Workbench from `launchWorkbench` in the old `src/workbench/client.ts` as a new Tool, `workbench_launch`. The bridge still never starts Workbench (ADR 0009).
+- Changed: it finds Workbench and the game through Steam (the registry, `libraryfolders.vdf`, `appmanifest_<app>.acf`), with no path setting (ADR 0010). A missing app gives its `steam://install/<app>` link. It takes the mod from the project list of Workbench, by ID or folder name, and never a packed project: the game or a Workshop mod.
+- Changed: in place of the old dependency links, the start adds `-addonsDir` from `REFORGER_WORKBENCH_PROFILE_PATH`. A test on Workbench 1.6 showed that a `-gproj` start without it does not load a mod whose Workshop dependency is in a moved download folder. The Tool now checks that the mod loaded and gives the errors of the Workbench log when it did not.
+- Real test, BridgeTest from WSL: loaded and compiled in 8 to 15 seconds; with a Workshop dependency, loaded only with `-addonsDir`.

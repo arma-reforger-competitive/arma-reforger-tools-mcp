@@ -12,4 +12,4 @@ The old bridge did all three, and each one cost more than it gave:
 
 - The NET API does not say which project is open or where it is: `GetLoadedProjects` gives only IDs, and Workbench 1.6 has no `EvaluateScript`. The bridge reads the project list of Workbench in Documents to find the folder of the open project.
 - `ReloadScripts` compiles all scripts of the open mod. When they have errors, the Handler script does not load, and the answer says to fix them.
-- A Tool that starts Workbench can come later as its own Tool. It would use this bridge for the calls.
+- The Tool `workbench_launch` starts Workbench, apart from the bridge, and uses the bridge for the calls (ADR 0010).
