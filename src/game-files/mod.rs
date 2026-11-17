@@ -9,7 +9,7 @@ mod pak;
 mod settings;
 mod tools;
 
-pub use error::{Error, Result};
+use error::{Error, Result};
 pub use tools::tools;
 
 #[cfg(test)]
