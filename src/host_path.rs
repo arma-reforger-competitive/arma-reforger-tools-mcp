@@ -15,6 +15,13 @@ pub fn host_path(raw: &str) -> PathBuf {
     PathBuf::from(converted.unwrap_or_else(|| raw.to_owned()))
 }
 
+/// The path `raw` in Windows form, for a program of Windows. `/mnt/d/Games` becomes `D:\Games`.
+/// A path in Windows form stays as it is. Spaces and quotes around the value are removed.
+pub fn windows_path(raw: &str) -> String {
+    let raw = raw.trim().trim_matches(['"', '\'']);
+    windows_from_wsl(raw).unwrap_or_else(|| raw.to_owned())
+}
+
 // region:    --- Support
 
 /// `D:\Games` or `D:/Games` as `/mnt/d/Games`, or `None` when `path` does not start with a drive.
@@ -55,6 +62,12 @@ fn windows_from_wsl(path: &str) -> Option<String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn gives_a_wsl_path_and_a_windows_path_in_windows_form() {
+        assert_eq!(windows_path("/mnt/d/DownloadedMods"), r"D:\DownloadedMods");
+        assert_eq!(windows_path(r" 'D:\DownloadedMods' "), r"D:\DownloadedMods");
+    }
 
     #[test]
     fn turns_a_windows_path_into_a_wsl_path() {

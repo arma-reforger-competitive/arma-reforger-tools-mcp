@@ -16,9 +16,13 @@ pub(super) const HOST_SETTING: &str = "REFORGER_WORKBENCH_HOST";
 pub(super) const PORT_SETTING: &str = "REFORGER_WORKBENCH_PORT";
 
 /// The Workbench folder in Documents, the folder that holds `profile` and `logs`. It is not
-/// `REFORGER_WORKBENCH_PROFILE_PATH` of game-files: that setting names the folder of the
-/// downloaded mods, which the user can move out of Documents.
+/// `DOWNLOADS_SETTING`: that setting names the folder of the downloaded mods, which the user can
+/// move out of Documents.
 pub(super) const DOCUMENTS_SETTING: &str = "REFORGER_WORKBENCH_DOCUMENTS_PATH";
+
+/// The folder whose `addons` folder holds the Workshop mods that Workbench downloaded. game-files
+/// reads the same setting.
+pub(super) const DOWNLOADS_SETTING: &str = "REFORGER_WORKBENCH_PROFILE_PATH";
 
 /// The NET API port that Workbench uses when its options do not change it.
 const DEFAULT_PORT: u16 = 5775;
@@ -37,6 +41,9 @@ pub(super) struct Settings {
     /// The Workbench folder in Documents as the user wrote it.
     pub(super) documents: Option<String>,
 
+    /// The folder of the downloaded mods as the user wrote it.
+    pub(super) downloads: Option<String>,
+
     /// How long the bridge waits for Workbench to take the connection.
     pub(super) connect_timeout: Duration,
 
@@ -45,6 +52,28 @@ pub(super) struct Settings {
 
     /// How long the bridge waits for Workbench to compile the scripts again.
     pub(super) reload_timeout: Duration,
+
+    /// The Steam folder in Windows form. `None`: the folder that the Windows registry names.
+    pub(super) steam: Option<String>,
+
+    /// How `workbench_launch` starts the Workbench program.
+    pub(super) starter: Starter,
+
+    /// How long `workbench_launch` waits for the scripts of a started Workbench.
+    pub(super) start_timeout: Duration,
+
+    /// How long `workbench_launch` waits between two checks of a starting Workbench.
+    pub(super) poll_interval: Duration,
+}
+
+/// How `workbench_launch` starts the Workbench program.
+pub(super) enum Starter {
+    /// With `Start-Process` of the PowerShell of Windows, apart from the server.
+    PowerShell,
+
+    /// A test gets the start command and fakes the start.
+    #[cfg(test)]
+    Test(std::sync::Arc<dyn Fn(&super::launch::StartCommand) + Send + Sync>),
 }
 
 /// The value of the port setting.
@@ -71,9 +100,14 @@ impl Settings {
             host: read(HOST_SETTING),
             port: Port::parse(read(PORT_SETTING).as_deref()),
             documents: read(DOCUMENTS_SETTING),
+            downloads: read(DOWNLOADS_SETTING),
             connect_timeout: Duration::from_secs(3),
             answer_timeout: Duration::from_secs(10),
             reload_timeout: Duration::from_secs(120),
+            steam: None,
+            starter: Starter::PowerShell,
+            start_timeout: Duration::from_secs(180),
+            poll_interval: Duration::from_secs(2),
         }
     }
 

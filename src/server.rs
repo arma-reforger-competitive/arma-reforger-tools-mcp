@@ -31,6 +31,8 @@ them, and they are not in the project folder.
 - `workbench_status`: the live state of the user's running Workbench: whether it runs, whether \
 the Handler script of this plugin is loaded, and which mod is open. For how to do something in \
 Workbench, use the wiki Tools.
+- `workbench_launch`: start Workbench with the user's mod named in `mod`, and wait until it is \
+ready. When Workbench runs already, it starts nothing and names the open mod.
 
 A class name, a method signature, or a game file path from memory is often wrong. These Tools \
 give the real one.";

@@ -5,9 +5,11 @@
 mod bridge;
 mod error;
 mod install;
+mod launch;
 mod net;
 mod project;
 mod settings;
+mod steam;
 mod tools;
 mod wire;
 

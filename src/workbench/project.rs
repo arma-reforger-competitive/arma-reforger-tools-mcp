@@ -15,7 +15,10 @@ use crate::host_path::host_path;
 /// One project from the project list of Workbench.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(super) struct Project {
-    /// The folder that holds the `.gproj` file.
+    /// The `.gproj` file as the project list names it, in Windows form.
+    pub(super) gproj: String,
+
+    /// The folder that holds the `.gproj` file, on this computer.
     pub(super) folder: PathBuf,
     pub(super) id: String,
     pub(super) guid: String,
@@ -51,6 +54,14 @@ pub(super) fn open_project(documents: &Path, loaded: &[String]) -> Result<Projec
     }
 }
 
+/// The mods in the project lists of Workbench whose `.gproj` file can be read, without the packed
+/// projects: the game and the mods from the Workshop. A mod that was moved or deleted is skipped.
+pub(super) fn listed_mods(documents: &Path) -> Result<Vec<Project>> {
+    let mut projects = listed_projects(documents)?;
+    projects.retain(|project| !is_packed(&project.folder));
+    Ok(projects)
+}
+
 // region:    --- Support
 
 /// Every project in the project lists of Workbench whose `.gproj` file can be read. A project
@@ -83,8 +94,8 @@ fn listed_projects(documents: &Path) -> Result<Vec<Project>> {
         let Ok(text) = fs::read_to_string(&list) else {
             continue;
         };
-        for gproj in quoted_values(&text, "FilePath") {
-            let gproj = host_path(&gproj);
+        for listed in quoted_values(&text, "FilePath") {
+            let gproj = host_path(&listed);
             let Ok(text) = fs::read_to_string(&gproj) else {
                 continue;
             };
@@ -93,6 +104,7 @@ fn listed_projects(documents: &Path) -> Result<Vec<Project>> {
                 continue;
             };
             let project = Project {
+                gproj: listed,
                 folder: folder.to_owned(),
                 id,
                 guid: quoted_values(&text, "GUID").next().unwrap_or_default(),
