@@ -264,6 +264,35 @@ async fn says_how_to_open_the_mod_when_workbench_has_only_the_game_loaded() {
 }
 
 #[tokio::test]
+async fn never_takes_the_game_or_a_downloaded_mod_as_the_open_mod() {
+    // -- Setup & Fixtures
+    // On Workbench 1.6, a mod whose dependency was not found did not load, and Workbench loaded
+    // only the game and the found dependency. Both are packed and in the project list.
+    let setup = Setup::new()
+        .with_packed("ArmaReforger", "58D0FB3206B6F859")
+        .with_packed("CoopSlotLobby", "672B195EAD3036D4");
+    let before = snapshot(setup.documents.path());
+    let port = fake_workbench(
+        Reply::workbench(None, Reload::Loads).loading(&["ArmaReforger", "CoopSlotLobby"]),
+    )
+    .await;
+
+    // -- Exec
+    let answer = setup.status(port).await;
+
+    // -- Check
+    assert!(answer.is_error, "{}", answer.text);
+    assert!(
+        answer
+            .text
+            .starts_with("Workbench has no mod of yours open"),
+        "{}",
+        answer.text
+    );
+    assert_eq!(snapshot(setup.documents.path()), before);
+}
+
+#[tokio::test]
 async fn names_both_mods_when_two_unrelated_mods_are_loaded() {
     // -- Setup & Fixtures
     let setup = Setup::with_projects(&[
@@ -461,6 +490,34 @@ impl Setup {
         fs::create_dir_all(&profile).unwrap();
         fs::write(profile.join(".projectList_app1874880_user1.conf"), list).unwrap();
         setup
+    }
+
+    /// Adds a packed project, like the game or a mod from the Workshop: a `.gproj` file next to
+    /// a `data.pak`, in a second project list, as Workbench 1.6 lists them.
+    fn with_packed(self, id: &str, guid: &str) -> Self {
+        let folder = self.project(id);
+        fs::create_dir_all(&folder).unwrap();
+        let file = folder.join("addon.gproj");
+        fs::write(
+            &file,
+            format!("GameProject {{\n ID \"{id}\"\n GUID \"{guid}\"\n TITLE \"{id}\"\n}}"),
+        )
+        .unwrap();
+        fs::write(folder.join("data.pak"), "").unwrap();
+        let list = self
+            .documents
+            .path()
+            .join("profile/.projectList_app1874910_user1.conf");
+        let mut text = fs::read_to_string(&list)
+            .unwrap_or_else(|_| "WBProjectList {\n Projects {\n }\n}\n".to_owned());
+        let item = format!(
+            "  WBProjectListItem {{\n   FilePath \"{}\"\n  }}\n }}\n}}\n",
+            file.display()
+        );
+        text.truncate(text.rfind(" }\n}").unwrap());
+        text.push_str(&item);
+        fs::write(&list, text).unwrap();
+        self
     }
 
     fn project(&self, id: &str) -> PathBuf {

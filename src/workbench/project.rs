@@ -28,7 +28,7 @@ pub(super) fn open_project(documents: &Path, loaded: &[String]) -> Result<Projec
     let listed = listed_projects(documents)?;
     let mut candidates: Vec<Project> = listed
         .into_iter()
-        .filter(|project| loaded.contains(&project.id))
+        .filter(|project| loaded.contains(&project.id) && !is_packed(&project.folder))
         .collect();
     let needed: Vec<String> = candidates
         .iter()
@@ -104,6 +104,19 @@ fn listed_projects(documents: &Path) -> Result<Vec<Project>> {
         }
     }
     Ok(projects)
+}
+
+/// Whether the folder of a project holds `.pak` files: the game and the mods from the Workshop
+/// are packed, and the user does not edit them. The bridge never writes into such a folder.
+fn is_packed(folder: &Path) -> bool {
+    fs::read_dir(folder).into_iter().flatten().any(|entry| {
+        entry.is_ok_and(|entry| {
+            entry
+                .path()
+                .extension()
+                .is_some_and(|ext| ext.eq_ignore_ascii_case("pak"))
+        })
+    })
 }
 
 /// The values of the lines `<key> "<value>"` in a Workbench config text.
