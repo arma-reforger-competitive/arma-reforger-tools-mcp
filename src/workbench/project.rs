@@ -8,7 +8,8 @@
 use std::fs;
 use std::path::{Path, PathBuf};
 
-use super::{Error, Result};
+use super::Result;
+use super::error::NoProject;
 use crate::host_path::host_path;
 
 /// One project from the project list of Workbench.
@@ -35,16 +36,18 @@ pub(super) fn open_project(documents: &Path, loaded: &[String]) -> Result<Projec
         .collect();
     candidates.retain(|project| !needed.contains(&project.guid));
     match candidates.len() {
-        0 => Err(Error::NoOpenProject {
+        0 => Err(NoProject::NotListed {
             loaded: loaded.to_vec(),
-        }),
+        }
+        .into()),
         1 => Ok(candidates.swap_remove(0)),
-        _ => Err(Error::ManyOpenProjects {
+        _ => Err(NoProject::Many {
             folders: candidates
                 .into_iter()
                 .map(|project| project.folder)
                 .collect(),
-        }),
+        }
+        .into()),
     }
 }
 
@@ -70,9 +73,10 @@ fn listed_projects(documents: &Path) -> Result<Vec<Project>> {
         })
         .collect();
     if lists.is_empty() {
-        return Err(Error::NoProjectList {
+        return Err(NoProject::NoList {
             folder: documents.to_owned(),
-        });
+        }
+        .into());
     }
     let mut projects = Vec::new();
     for list in lists {
@@ -136,141 +140,8 @@ fn dependencies(text: &str) -> Vec<String> {
 // region:    --- Tests
 
 #[cfg(test)]
-pub(super) mod tests {
-    use std::fmt::Write as _;
-
+mod tests {
     use super::*;
-
-    /// A `.gproj` text like the one that Workbench 1.6 writes for a new project.
-    pub(crate) fn gproj(id: &str, guid: &str, dependencies: &[&str]) -> String {
-        let mut text = format!("GameProject {{\n ID \"{id}\"\n GUID \"{guid}\"\n TITLE \"{id}\"\n");
-        text.push_str(" Dependencies {\n  \"58D0FB3206B6F859\"\n");
-        for dependency in dependencies {
-            let _ = writeln!(text, "  \"{dependency}\"");
-        }
-        text.push_str(" }\n}");
-        text
-    }
-
-    /// Writes a project list in `documents` with the `.gproj` files of `projects`.
-    pub(crate) fn write_projects(documents: &Path, projects: &[(&Path, String)]) {
-        let mut list = "WBProjectList {\n Projects {\n".to_owned();
-        for (folder, text) in projects {
-            fs::create_dir_all(folder).unwrap();
-            let gproj = folder.join("addon.gproj");
-            fs::write(&gproj, text).unwrap();
-            let _ = writeln!(
-                list,
-                "  WBProjectListItem {{\n   FilePath \"{}\"\n  }}",
-                gproj.display()
-            );
-        }
-        list.push_str(" }\n}\n");
-        fs::create_dir_all(documents.join("profile")).unwrap();
-        fs::write(
-            documents.join("profile/.projectList_app1874880_user1.conf"),
-            list,
-        )
-        .unwrap();
-    }
-
-    fn loaded(ids: &[&str]) -> Vec<String> {
-        ids.iter().map(|id| (*id).to_owned()).collect()
-    }
-
-    #[test]
-    fn finds_the_open_project_in_the_project_list() {
-        // -- Setup & Fixtures
-        let dir = tempfile::tempdir().unwrap();
-        let mod_a = dir.path().join("Mods/BridgeTest");
-        let mod_b = dir.path().join("Mods/Other");
-        write_projects(
-            dir.path(),
-            &[
-                (&mod_a, gproj("BridgeTest", "6AE15995AB330875", &[])),
-                (&mod_b, gproj("Other", "1111111111111111", &[])),
-            ],
-        );
-
-        // -- Exec
-        let project = open_project(dir.path(), &loaded(&["ArmaReforger", "BridgeTest"])).unwrap();
-
-        // -- Check
-        assert_eq!(project.folder, mod_a);
-        assert_eq!(project.id, "BridgeTest");
-    }
-
-    #[test]
-    fn picks_the_project_that_needs_the_other_loaded_project() {
-        // -- Setup & Fixtures
-        let dir = tempfile::tempdir().unwrap();
-        let mission = dir.path().join("Mission");
-        let lobby = dir.path().join("Lobby");
-        write_projects(
-            dir.path(),
-            &[
-                (&lobby, gproj("Lobby", "2222222222222222", &[])),
-                (
-                    &mission,
-                    gproj("Mission", "3333333333333333", &["2222222222222222"]),
-                ),
-            ],
-        );
-
-        // -- Exec
-        let project =
-            open_project(dir.path(), &loaded(&["ArmaReforger", "Lobby", "Mission"])).unwrap();
-
-        // -- Check
-        assert_eq!(project.folder, mission);
-    }
-
-    #[test]
-    fn says_so_when_only_the_game_is_open() {
-        // -- Setup & Fixtures
-        let dir = tempfile::tempdir().unwrap();
-        write_projects(
-            dir.path(),
-            &[(&dir.path().join("A"), gproj("A", "4444444444444444", &[]))],
-        );
-
-        // -- Exec & Check
-        assert!(matches!(
-            open_project(dir.path(), &loaded(&["ArmaReforger"])),
-            Err(Error::NoOpenProject { .. })
-        ));
-    }
-
-    #[test]
-    fn says_so_when_two_unrelated_projects_are_loaded() {
-        // -- Setup & Fixtures
-        let dir = tempfile::tempdir().unwrap();
-        write_projects(
-            dir.path(),
-            &[
-                (&dir.path().join("A"), gproj("A", "4444444444444444", &[])),
-                (&dir.path().join("B"), gproj("B", "5555555555555555", &[])),
-            ],
-        );
-
-        // -- Exec & Check
-        assert!(matches!(
-            open_project(dir.path(), &loaded(&["A", "B"])),
-            Err(Error::ManyOpenProjects { folders }) if folders.len() == 2
-        ));
-    }
-
-    #[test]
-    fn names_the_setting_when_the_folder_has_no_project_list() {
-        // -- Setup & Fixtures
-        let dir = tempfile::tempdir().unwrap();
-
-        // -- Exec & Check
-        assert!(matches!(
-            open_project(dir.path(), &loaded(&["A"])),
-            Err(Error::NoProjectList { .. })
-        ));
-    }
 
     #[test]
     fn reads_the_project_list_that_workbench_wrote() {

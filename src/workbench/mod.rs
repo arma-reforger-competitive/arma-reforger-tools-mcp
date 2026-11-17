@@ -11,7 +11,7 @@ mod settings;
 mod tools;
 mod wire;
 
-pub use error::{Error, Result};
+use error::{Error, Result};
 pub use tools::tools;
 
 // endregion: --- Modules

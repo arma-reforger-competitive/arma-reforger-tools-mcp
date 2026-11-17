@@ -28,7 +28,7 @@ engine pages.
 Workbench downloaded. They are inside .pak archives, so grep, find, and file search cannot see \
 them, and they are not in the project folder.
 - `workbench_status`: the live state of the user's running Workbench: whether it runs, whether \
-the handler script of this plugin is loaded, and which mod is open. For how to do something in \
+the Handler script of this plugin is loaded, and which mod is open. For how to do something in \
 Workbench, use the wiki Tools.
 
 A class name, a method signature, or a game file path from memory is often wrong. These Tools \

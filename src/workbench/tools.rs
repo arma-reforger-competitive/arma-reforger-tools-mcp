@@ -8,6 +8,7 @@ use serde_json::Map;
 
 use super::Error;
 use super::bridge::{Bridge, Setup};
+use super::install::HANDLER_FOLDER;
 use super::settings::Settings;
 
 /// Gives the Workbench Tools to the server, with the settings from the environment.
@@ -21,8 +22,8 @@ pub(super) fn router<S: Send + Sync + 'static>(settings: Settings) -> ToolRouter
     let workbench_status = Tool::new(
         "workbench_status",
         "Check the connection to Arma Reforger Workbench, the editor for mods, and get it ready \
-         for the Workbench Tools. When Workbench runs, it returns the version of the handler \
-         script of this plugin and the open mod project. When the handler script is missing or \
+         for the Workbench Tools. When Workbench runs, it returns the version of the Handler \
+         script of this plugin and the open mod project. When the Handler script is missing or \
          old, it first copies the new one into the open mod and reloads the scripts, and says \
          so. When Workbench is not running, it says how to start it and which settings to \
          check. It never starts or stops Workbench, and it writes only its own file \
@@ -47,7 +48,7 @@ fn no_inputs() -> Map<String, serde_json::Value> {
     schema
 }
 
-/// The Tool labels of `workbench_status`: it copies and overwrites its handler file, a second
+/// The Tool labels of `workbench_status`: it copies and overwrites its Handler script, a second
 /// call has no more effect, and it does not use the internet.
 fn labels() -> ToolAnnotations {
     ToolAnnotations::new()
@@ -57,29 +58,28 @@ fn labels() -> ToolAnnotations {
         .open_world(false)
 }
 
-/// The answer of `workbench_status`. "Not running" and the three ways to a loaded handler script
-/// are normal answers. Other failures are errors.
+/// The answer of `workbench_status`. "Not running" and the three ways to a loaded Handler script
+/// are the states that this Tool reports, so they are normal answers, also when `NotRunning` is an
+/// error for the other Workbench Tools. Other failures are errors.
 async fn status(bridge: &Bridge) -> CallToolResult {
-    let (answer, setup) = match bridge.call("ping", Map::new()).await {
-        Ok(called) => called,
+    let setup = match bridge.call("ping", Map::new()).await {
+        Ok((_, setup)) => setup,
         Err(error @ Error::NotRunning { .. }) => {
             return CallToolResult::success(vec![ContentBlock::text(error.to_string())]);
         }
         Err(error) => return CallToolResult::error(vec![ContentBlock::text(error.to_string())]),
     };
-    let version = answer
-        .get("version")
-        .and_then(serde_json::Value::as_str)
-        .unwrap_or_default();
+    // The bridge answers only when the Handler script has the version of this server.
+    let version = env!("CARGO_PKG_VERSION");
     let loaded = match setup {
-        Setup::Loaded => format!("the handler script is loaded (version {version})"),
+        Setup::Loaded => format!("the Handler script is loaded (version {version})"),
         Setup::Installed { file } => format!(
-            "the handler script of this plugin was not loaded. The bridge copied it to {} and \
+            "the Handler script of this plugin was not loaded. The bridge copied it to {} and \
              reloaded the scripts, and now it is loaded (version {version})",
             file.display()
         ),
         Setup::Updated { file, old } => format!(
-            "it had an old handler script (version {old}). The bridge copied the new one to {} \
+            "it had an old Handler script (version {old}). The bridge copied the new one to {} \
              and reloaded the scripts, and now it is loaded (version {version})",
             file.display()
         ),
@@ -93,7 +93,9 @@ async fn status(bridge: &Bridge) -> CallToolResult {
         Err(error) => format!("The open mod project is not known: {error}"),
     };
     CallToolResult::success(vec![ContentBlock::text(format!(
-        "Workbench is running, and {loaded}. {project}"
+        "Workbench is running, and {loaded}. {project} The Workbench Tools can use it now. Before \
+         you pack or publish the mod, delete its folder {HANDLER_FOLDER}: Workbench packs the \
+         Handler script with the mod."
     ))])
 }
 

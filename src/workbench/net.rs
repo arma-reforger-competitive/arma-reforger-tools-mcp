@@ -9,11 +9,11 @@ use tokio::net::TcpStream;
 use tokio::time::timeout;
 
 use super::error::Garbled;
-use super::settings::{Address, Settings};
+use super::settings::Address;
 use super::wire::{self, MAX_ANSWER_BYTES};
 use super::{Error, Result};
 
-/// What Workbench answers to a function that it does not know: a handler script that is not
+/// What Workbench answers to a function that it does not know: a Handler script that is not
 /// loaded, or a built-in function that this Workbench does not have.
 const UNDEFINED_FUNC: &str = "Undefined API func";
 
@@ -24,27 +24,27 @@ pub(super) enum Answer {
     UndefinedFunc,
 }
 
-/// Calls `func` on the NET API at `address` with `params`, waits up to `wait` for the answer
-/// after the connect, and returns the JSON payload of the answer.
+/// How long one call waits: for the connect, then for the whole answer.
+pub(super) struct Wait {
+    pub(super) connect: Duration,
+    pub(super) answer: Duration,
+}
+
+/// Calls `func` on the NET API at `address` with `params`, and returns the JSON payload of the
+/// answer.
 pub(super) async fn call(
-    settings: &Settings,
-    address: &Address,
+    address: Address,
     func: &'static str,
     mut params: Map<String, Value>,
-    wait: Duration,
+    wait: Wait,
 ) -> Result<Answer> {
     params.insert("APIFunc".to_owned(), Value::from(func));
     let request = wire::request(&Value::Object(params).to_string());
-    let not_running = || Error::NotRunning {
-        host: address.host.clone(),
-        port: address.port,
-    };
     let target = (address.host.as_str(), address.port);
     // Under WSL, the Windows firewall can drop the connection to a closed port, so a time-out
     // here also means that nothing listens.
-    let Ok(Ok(mut stream)) = timeout(settings.connect_timeout, TcpStream::connect(target)).await
-    else {
-        return Err(not_running());
+    let Ok(Ok(mut stream)) = timeout(wait.connect, TcpStream::connect(target)).await else {
+        return Err(Error::NotRunning { address });
     };
     let exchange = async {
         stream.write_all(&request).await?;
@@ -54,14 +54,13 @@ pub(super) async fn call(
         (&mut stream).take(limit).read_to_end(&mut bytes).await?;
         Ok::<_, std::io::Error>(bytes)
     };
-    let bytes = match timeout(wait, exchange).await {
+    let bytes = match timeout(wait.answer, exchange).await {
         Ok(Ok(bytes)) => bytes,
-        Ok(Err(_)) => return Err(not_running()),
+        Ok(Err(err)) => return Err(Error::ConnectionLost { address, err }),
         Err(_) => {
             return Err(Error::NoAnswer {
-                host: address.host.clone(),
-                port: address.port,
-                secs: wait.as_secs_f32(),
+                address,
+                secs: wait.answer.as_secs_f32(),
             });
         }
     };
