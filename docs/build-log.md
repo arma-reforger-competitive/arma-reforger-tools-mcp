@@ -44,7 +44,7 @@
 
 ## workbench_status (#40)
 
-- Ported the NET API wire format and the TCP call from the old `src/workbench/protocol.ts` and `client.ts`, and the Windows host of WSL from `detectWslHostIp` in `src/utils/wsl-path.ts`. It reads `/proc/net/route` and runs no `ip` command. One new Tool, `workbench_status`, and one handler script, `ReforgerBridge.c`, in place of the old 20 handler files.
-- Not ported: the start of Workbench, the 30-second poll for a recompile, and the dependency links (ADR 0009). After a copy, the bridge calls the built-in `ReloadScripts` once. A test on Workbench 1.6 showed that it loads a new or changed handler script with no restart.
-- Changed: the bridge finds the open mod from `GetLoadedProjects` and the project list of Workbench in Documents. The old code guessed it from a project folder setting. Every answer of the handler script has its version, so an old copy is replaced.
-- Pack test: Workbench packs the handler script into the mod (`data.pak` of BridgeTest held `Scripts/WorkbenchGame/ReforgerBridge/ReforgerBridge.c`), and has no setting to leave a folder out. The README says to delete the folder before a pack and gives the `.gitignore` line.
+- Ported the NET API wire format and the TCP call from the old `src/workbench/protocol.ts` and `client.ts`, and the Windows host of WSL from `detectWslHostIp` in `src/utils/wsl-path.ts`. It reads `/proc/net/route` and runs no `ip` command. One new Tool, `workbench_status`, and one Handler script, `ReforgerBridge.c`, in place of the old 20 handler files.
+- Not ported: the start of Workbench, the 30-second poll for a recompile, and the dependency links (ADR 0009). After a copy, the bridge calls the built-in `ReloadScripts` once. A test on Workbench 1.6 showed that it loads a new or changed Handler script with no restart.
+- Changed: the bridge finds the open mod from `GetLoadedProjects` and the project list of Workbench in Documents. The old code guessed it from a project folder setting. Every answer of the Handler script has its version, so an old copy is replaced.
+- Pack test: Workbench packs the Handler script into the mod (`data.pak` of BridgeTest held `Scripts/WorkbenchGame/ReforgerBridge/ReforgerBridge.c`), and has no setting to leave a folder out. The README says to delete the folder before a pack and gives the `.gitignore` line.

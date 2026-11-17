@@ -52,7 +52,7 @@ History: 53 sessions with the old server, from 2026-11-05 to 2026-11-15.
 | `wb_play` | not yet |  | never used in 53 sessions, suggest: not needed |
 | `wb_prefabs` | not yet |  | never used in 53 sessions, suggest: not needed |
 | `wb_projects` | not yet |  | never used in 53 sessions, suggest: not needed |
-| `wb_reload` | not yet |  | never used in 53 sessions, suggest: not needed |
+| `wb_reload` | not needed | the Workbench bridge calls ReloadScripts itself after it copies the Handler script (#40). The old Tool was never used in 53 sessions, and a user compiles their own scripts in the Script Editor (F7). | never used in 53 sessions, suggest: not needed |
 | `wb_resources` | not yet |  | never used in 53 sessions, suggest: not needed |
 | `wb_save` | not yet |  | never used in 53 sessions, suggest: not needed |
 | `wb_script_editor` | not yet |  | never used in 53 sessions, suggest: not needed |

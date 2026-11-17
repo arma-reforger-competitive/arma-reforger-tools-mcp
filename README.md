@@ -1,6 +1,6 @@
 # Arma Reforger Tools MCP
 
-> **Work in progress.** The plugin installs and has two tools, `wiki_search` and `wiki_read`. Follow the [roadmap](https://github.com/lanka-community/arma-reforger-tools-mcp/issues/1) to see what is done and what comes next.
+> **Work in progress.** The plugin installs and has the five tools below. Follow the [roadmap](https://github.com/lanka-community/arma-reforger-tools-mcp/issues/1) to see what is done and what comes next.
 
 `reforger` is a Claude Code plugin that helps you learn, build, and fix Arma Reforger mods. It gives Claude two kinds of help:
 
@@ -25,10 +25,15 @@ claude plugin install reforger@reforger-local
 
 ## Tools
 
-| Tool          | What it does                                                                                     |
-| ------------- | ------------------------------------------------------------------------------------------------ |
-| `wiki_search` | Finds wiki pages and engine pages by words, with the best Section of each.                       |
-| `wiki_read`   | Returns one Arma Reforger wiki page or Enfusion engine page by its title, or one Section of it. |
+| Tool               | What it does                                                                                                   |
+| ------------------ | -------------------------------------------------------------------------------------------------------------- |
+| `api_search`       | Finds classes and methods of the Enfusion and Arma Reforger script API, with signatures and parent classes.    |
+| `wiki_search`      | Finds wiki pages and engine pages by words, with the best Section of each.                                     |
+| `wiki_read`        | Returns one Arma Reforger wiki page or Enfusion engine page by its title, or one Section of it.               |
+| `game_find`        | Finds the scripts, Prefabs, and configs inside the `.pak` files of the game and of downloaded Workshop mods.   |
+| `workbench_status` | Checks the connection to a running Workbench, copies the Handler script into the open mod, and names that mod. |
+
+`game_find` and `workbench_status` need settings. Their READMEs list them: [`src/game-files/README.md`](src/game-files/README.md) and [`src/workbench/README.md`](src/workbench/README.md).
 
 ## Development
 
