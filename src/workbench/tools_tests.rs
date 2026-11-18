@@ -2,6 +2,7 @@ use std::collections::BTreeMap;
 use std::fmt::Write as _;
 use std::fs;
 use std::path::{Path, PathBuf};
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
@@ -13,7 +14,7 @@ use super::*;
 use crate::server::Server;
 use crate::test_support::{self, Answer};
 use crate::workbench::install::HANDLER_SCRIPT;
-use crate::workbench::launch::StartCommand;
+use crate::workbench::launch::{FakeWindows, StartCommand};
 use crate::workbench::settings::{Port, Starter};
 use crate::workbench::steam::{App, write_steam};
 use crate::workbench::wire::push_string;
@@ -549,6 +550,127 @@ async fn starts_nothing_when_workbench_runs_already() {
 }
 
 #[tokio::test]
+async fn starts_steam_first_when_no_user_is_logged_in() {
+    // -- Setup & Fixtures
+    let setup = Setup::new();
+    let steam = tempfile::tempdir().unwrap();
+    write_steam(steam.path(), &[App::Game, App::Tools]);
+    let port = free_port().await;
+    let started = Arc::new(Mutex::new(Vec::new()));
+    let start = start_fake_workbench(
+        port,
+        Reply::workbench(Some(env!("CARGO_PKG_VERSION")), Reload::Loads),
+        &started,
+    );
+    // Workbench closes when it starts without Steam, so the fake checks the login at the start.
+    let windows = Arc::new_cyclic(|windows: &std::sync::Weak<FakeWindows>| {
+        let windows = windows.clone();
+        fake_windows(
+            move |command: &StartCommand| {
+                let windows = windows.upgrade().unwrap();
+                assert!(windows.steam_logged_in.load(Ordering::SeqCst));
+                start(command);
+            },
+            false,
+            true,
+        )
+    });
+
+    // -- Exec
+    let answer = setup
+        .launch_on(port, steam.path(), Arc::clone(&windows), json!({}))
+        .await;
+
+    // -- Check
+    assert!(!answer.is_error, "{}", answer.text);
+    assert!(
+        answer.text.starts_with(
+            "No user was logged in to Steam, so workbench_launch started Steam. Workbench \
+             started with the mod BridgeTest and compiled the scripts."
+        ),
+        "{}",
+        answer.text
+    );
+    assert_eq!(
+        *windows.steam_starts.lock().unwrap(),
+        [format!(r"{}\steam.exe", steam.path().display())]
+    );
+    assert_eq!(started.lock().unwrap().len(), 1);
+}
+
+#[tokio::test]
+async fn starts_no_steam_when_a_user_is_logged_in() {
+    // -- Setup & Fixtures
+    let setup = Setup::new();
+    let steam = tempfile::tempdir().unwrap();
+    write_steam(steam.path(), &[App::Game, App::Tools]);
+    let port = free_port().await;
+    let started = Arc::new(Mutex::new(Vec::new()));
+    let start = start_fake_workbench(
+        port,
+        Reply::workbench(Some(env!("CARGO_PKG_VERSION")), Reload::Loads),
+        &started,
+    );
+    let windows = Arc::new(fake_windows(start, true, true));
+
+    // -- Exec
+    let answer = setup
+        .launch_on(port, steam.path(), Arc::clone(&windows), json!({}))
+        .await;
+
+    // -- Check
+    assert!(!answer.is_error, "{}", answer.text);
+    assert!(
+        answer
+            .text
+            .starts_with("Workbench started with the mod BridgeTest"),
+        "{}",
+        answer.text
+    );
+    assert!(windows.steam_starts.lock().unwrap().is_empty());
+}
+
+#[tokio::test]
+async fn says_to_log_in_to_steam_when_no_user_logs_in() {
+    // -- Setup & Fixtures
+    let setup = Setup::new();
+    let steam = tempfile::tempdir().unwrap();
+    write_steam(steam.path(), &[App::Game, App::Tools]);
+    let started = Arc::new(Mutex::new(Vec::new()));
+    let record = Arc::clone(&started);
+    let windows = Arc::new(fake_windows(
+        move |command: &StartCommand| record.lock().unwrap().push(format!("{command:?}")),
+        false,
+        false,
+    ));
+
+    // -- Exec
+    let answer = setup
+        .launch_on(
+            free_port().await,
+            steam.path(),
+            Arc::clone(&windows),
+            json!({}),
+        )
+        .await;
+
+    // -- Check
+    assert!(answer.is_error, "{}", answer.text);
+    assert_eq!(
+        answer.text,
+        "Workbench needs Steam with a logged-in user. The bridge started Steam, but no user \
+         logged in within 0 seconds. Ask the user to log in to Steam, or to wait until the Steam \
+         update ends. Then call workbench_launch again."
+    );
+    assert_eq!(windows.steam_starts.lock().unwrap().len(), 1);
+    assert!(started.lock().unwrap().is_empty(), "it started Workbench");
+    assert!(
+        !setup.handler_file().exists(),
+        "it copied the Handler script into the mod"
+    );
+}
+
+#[tokio::test]
 async fn says_how_to_install_arma_reforger_tools_when_steam_does_not_have_them() {
     // -- Setup & Fixtures
     let setup = Setup::new();
@@ -1058,7 +1180,7 @@ impl Setup {
     }
 
     /// Calls `workbench_launch` with `input`, Workbench on 127.0.0.1 at `port`, the Steam
-    /// folder `steam`, and a fake start that calls `start`.
+    /// folder `steam`, a user logged in to Steam, and a fake start that calls `start`.
     async fn launch(
         &self,
         port: u16,
@@ -1066,10 +1188,22 @@ impl Setup {
         start: impl Fn(&StartCommand) + Send + Sync + 'static,
         input: Value,
     ) -> Answer {
+        let windows = Arc::new(fake_windows(start, true, true));
+        self.launch_on(port, steam, windows, input).await
+    }
+
+    /// Calls `workbench_launch` like `launch`, on the fake Windows `windows`.
+    async fn launch_on(
+        &self,
+        port: u16,
+        steam: &Path,
+        windows: Arc<FakeWindows>,
+        input: Value,
+    ) -> Answer {
         let settings = self.settings(
             Port::Valid(port),
             Some(steam.to_str().unwrap().to_owned()),
-            Starter::Test(Arc::new(start)),
+            Starter::Test(windows),
         );
         let client = test_support::connect(router::<Server>(settings)).await;
         test_support::call(&client, "workbench_launch", input).await
@@ -1086,6 +1220,7 @@ impl Setup {
             reload_timeout: Duration::from_secs(2),
             steam,
             starter,
+            steam_timeout: Duration::from_millis(300),
             start_timeout: Duration::from_millis(600),
             poll_interval: Duration::from_millis(50),
         }
@@ -1188,6 +1323,21 @@ async fn free_port() -> u16 {
 
 /// A fake start: it records the start command in `started` and starts a fake Workbench with
 /// `reply` on `port`.
+/// A fake Windows that starts Workbench with `start`. `logged_in`: a user is logged in to Steam.
+/// `logs_in`: a start of Steam logs the user in.
+fn fake_windows(
+    start: impl Fn(&StartCommand) + Send + Sync + 'static,
+    logged_in: bool,
+    logs_in: bool,
+) -> FakeWindows {
+    FakeWindows {
+        start_workbench: Box::new(start),
+        steam_logged_in: AtomicBool::new(logged_in),
+        steam_logs_in: logs_in,
+        steam_starts: Mutex::new(Vec::new()),
+    }
+}
+
 fn start_fake_workbench(
     port: u16,
     reply: Reply,

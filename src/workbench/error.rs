@@ -98,8 +98,18 @@ pub enum NoProject {
 /// Why `workbench_launch` did not start Workbench, or why Workbench did not get ready.
 #[derive(Debug)]
 pub enum NoStart {
-    /// The registry names no Steam folder, or the folder has no library file.
+    /// The registry names no Steam folder, or the folder has no Steam program or no library file.
     NoSteam,
+
+    /// No user was logged in to Steam, and PowerShell could not start Steam.
+    SteamStartFailed {
+        err: std::io::Error,
+    },
+
+    /// The bridge started Steam, but no user logged in in time.
+    NoSteamLogin {
+        secs: u64,
+    },
 
     NotInstalled {
         app: App,
@@ -288,9 +298,21 @@ impl fmt::Display for NoStart {
             Self::NoSteam => write!(
                 f,
                 "The bridge did not find Steam: the Windows registry names no Steam folder \
-                 (HKCU\\Software\\Valve\\Steam, SteamPath), or the folder has no \
-                 steamapps\\libraryfolders.vdf. Install Steam, sign in, and install Arma Reforger \
+                 (HKCU\\Software\\Valve\\Steam, SteamPath), or the folder has no steam.exe or \
+                 no steamapps\\libraryfolders.vdf. Install Steam, sign in, and install Arma Reforger \
                  and Arma Reforger Tools. Then call workbench_launch again."
+            ),
+            Self::SteamStartFailed { err } => write!(
+                f,
+                "Workbench needs Steam with a logged-in user, and no user was logged in. The \
+                 bridge could not start Steam through PowerShell: {err}. Start Steam yourself, \
+                 log in, and call workbench_launch again."
+            ),
+            Self::NoSteamLogin { secs } => write!(
+                f,
+                "Workbench needs Steam with a logged-in user. The bridge started Steam, but no \
+                 user logged in within {secs} seconds. Ask the user to log in to Steam, or to \
+                 wait until the Steam update ends. Then call workbench_launch again."
             ),
             Self::NotInstalled { app } => write!(
                 f,

@@ -10,6 +10,9 @@
 //! the Workbench folder in Documents. It does not get the launch options of Steam, so when the
 //! user moved the folder of the downloaded mods, `-addonsDir` names it (Workbench 1.6 test: a
 //! Workshop dependency in `D:\DownloadedMods\addons` loaded only with it).
+//!
+//! Workbench needs Steam with a logged-in user, and it does not start Steam itself. So when no
+//! user is logged in, it starts Steam first and waits for the login (see `steam.rs`).
 
 use std::fmt::Write as _;
 use std::fs;
@@ -22,8 +25,8 @@ use super::bridge::Bridge;
 use super::error::{NoProject, NoStart};
 use super::install::install;
 use super::project::{Project, listed_mods};
-use super::settings::Starter;
-use super::steam::find_install;
+use super::settings::{Settings, Starter};
+use super::steam::{find_install, steam_logged_in};
 use super::{Error, Result};
 use crate::host_path::windows_path;
 
@@ -35,12 +38,13 @@ pub(super) enum Launched {
     /// Workbench ran already, so it started nothing.
     AlreadyRunning,
 
-    /// It started Workbench with `project` open, and the scripts are compiled.
-    Started { project: Project },
+    /// It started Workbench with `project` open, and the scripts are compiled. `steam`: it
+    /// started Steam first.
+    Started { project: Project, steam: bool },
 
     /// It started Workbench without a mod, because the project list has none. Workbench shows
-    /// its launcher.
-    StartedLauncher,
+    /// its launcher. `steam`: it started Steam first.
+    StartedLauncher { steam: bool },
 }
 
 /// The start of the Workbench program. Every path is in Windows form.
@@ -68,6 +72,7 @@ pub(super) async fn launch(bridge: &Bridge, wanted: Option<&str>) -> Result<Laun
     let settings = bridge.settings();
     let install_folders = find_install(settings.steam.as_deref()).await?;
     let project = choose(mods(bridge)?, wanted)?;
+    let steam = ensure_steam(settings, &install_folders.steam).await?;
     if let Some(project) = &project {
         install(&project.folder)?;
     }
@@ -84,7 +89,7 @@ pub(super) async fn launch(bridge: &Bridge, wanted: Option<&str>) -> Result<Laun
         .await
         .map_err(|err| NoStart::StartFailed { err })?;
     let Some(project) = project else {
-        return Ok(Launched::StartedLauncher);
+        return Ok(Launched::StartedLauncher { steam });
     };
     wait_for_scripts(bridge).await?;
     // A mod whose dependency Workbench does not find does not load, and Workbench opens only the
@@ -96,7 +101,22 @@ pub(super) async fn launch(bridge: &Bridge, wanted: Option<&str>) -> Result<Laun
         }
         .into());
     }
-    Ok(Launched::Started { project })
+    Ok(Launched::Started { project, steam })
+}
+
+/// The Windows of a test: it fakes the start of Workbench and of Steam, and the Steam login.
+#[cfg(test)]
+pub(super) struct FakeWindows {
+    pub(super) start_workbench: Box<dyn Fn(&StartCommand) + Send + Sync>,
+
+    /// True while a user is logged in to Steam.
+    pub(super) steam_logged_in: std::sync::atomic::AtomicBool,
+
+    /// True: a start of Steam logs the user in.
+    pub(super) steam_logs_in: bool,
+
+    /// The Steam programs that `workbench_launch` started.
+    pub(super) steam_starts: std::sync::Mutex<Vec<String>>,
 }
 
 // region:    --- Support
@@ -146,37 +166,101 @@ fn choose(mods: Vec<Project>, wanted: Option<&str>) -> Result<Option<Project>> {
     }
 }
 
-/// Starts the Workbench program. `Start-Process` of the PowerShell of Windows starts it apart
-/// from the server, so Workbench keeps running when the server stops. Under WSL,
-/// `powershell.exe` is the PowerShell of Windows.
-async fn start(starter: &Starter, command: &StartCommand) -> std::io::Result<()> {
+/// Starts Steam when no user is logged in, and waits until a user is. True when it started
+/// Steam. On Workbench 1.6 a logged-in user came 8 seconds after the start.
+async fn ensure_steam(settings: &Settings, exe: &str) -> Result<bool> {
+    if logged_in(&settings.starter).await {
+        return Ok(false);
+    }
+    start_steam(&settings.starter, exe)
+        .await
+        .map_err(|err| NoStart::SteamStartFailed { err })?;
+    let deadline = Instant::now() + settings.steam_timeout;
+    loop {
+        tokio::time::sleep(settings.poll_interval).await;
+        if logged_in(&settings.starter).await {
+            return Ok(true);
+        }
+        if Instant::now() >= deadline {
+            let secs = settings.steam_timeout.as_secs();
+            return Err(NoStart::NoSteamLogin { secs }.into());
+        }
+    }
+}
+
+/// True when a user is logged in to Steam.
+async fn logged_in(starter: &Starter) -> bool {
+    match starter {
+        Starter::PowerShell => steam_logged_in().await,
+        #[cfg(test)]
+        Starter::Test(windows) => windows
+            .steam_logged_in
+            .load(std::sync::atomic::Ordering::SeqCst),
+    }
+}
+
+/// Starts Steam. `-silent` keeps its window closed, and Steam opens its login window only when it
+/// has no saved login.
+async fn start_steam(starter: &Starter, exe: &str) -> std::io::Result<()> {
     match starter {
         Starter::PowerShell => {
-            let status = Command::new("powershell.exe")
-                .args(["-NoProfile", "-NonInteractive", "-Command"])
-                .arg(start_script(command))
-                .status()
-                .await?;
-            if status.success() {
-                Ok(())
-            } else {
-                Err(std::io::Error::other(format!(
-                    "PowerShell ended with {status}"
-                )))
-            }
+            powershell(&format!(
+                "Start-Process -FilePath {} -ArgumentList '-silent'",
+                quote(exe)
+            ))
+            .await
         }
         #[cfg(test)]
-        Starter::Test(start) => {
-            start(command);
+        Starter::Test(windows) => {
+            windows.steam_starts.lock().unwrap().push(exe.to_owned());
+            if windows.steam_logs_in {
+                windows
+                    .steam_logged_in
+                    .store(true, std::sync::atomic::Ordering::SeqCst);
+            }
             Ok(())
         }
     }
 }
 
-/// The PowerShell command that starts `command`. Single quotes keep every character of a path,
-/// and a single quote in a path is written twice.
+/// Starts the Workbench program.
+async fn start(starter: &Starter, command: &StartCommand) -> std::io::Result<()> {
+    match starter {
+        Starter::PowerShell => powershell(&start_script(command)).await,
+        #[cfg(test)]
+        Starter::Test(windows) => {
+            (windows.start_workbench)(command);
+            Ok(())
+        }
+    }
+}
+
+/// Runs `script` in the PowerShell of Windows. `Start-Process` in it starts a program apart from
+/// the server, so the program keeps running when the server stops. Under WSL, `powershell.exe` is
+/// the PowerShell of Windows.
+async fn powershell(script: &str) -> std::io::Result<()> {
+    let status = Command::new("powershell.exe")
+        .args(["-NoProfile", "-NonInteractive", "-Command"])
+        .arg(script)
+        .status()
+        .await?;
+    if status.success() {
+        Ok(())
+    } else {
+        Err(std::io::Error::other(format!(
+            "PowerShell ended with {status}"
+        )))
+    }
+}
+
+/// `text` in PowerShell single quotes, which keep every character. A single quote in `text` is
+/// written twice.
+fn quote(text: &str) -> String {
+    format!("'{}'", text.replace('\'', "''"))
+}
+
+/// The PowerShell command that starts `command`.
 fn start_script(command: &StartCommand) -> String {
-    let quote = |text: &str| format!("'{}'", text.replace('\'', "''"));
     let mut script = format!(
         "Start-Process -FilePath {} -WorkingDirectory {}",
         quote(&command.workbench),
