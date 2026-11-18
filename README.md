@@ -54,6 +54,7 @@ ast-grep scan -c lint/ast-grep/sgconfig.yml src
 cargo clippy --workspace --all-targets -- -D warnings
 cargo nextest run --workspace --profile ci
 node --test .claude/skills/port-status/port-status.test.ts
+node --test .claude/skills/workbench-test/net-api.test.ts
 cargo deny --workspace check
 ```
 
