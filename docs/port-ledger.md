@@ -20,7 +20,7 @@ History: 53 sessions with the old server, from 2026-11-05 to 2026-11-15.
 | `config_create` | not yet |  | never used in 53 sessions, suggest: not needed |
 | `game_browse` | not yet |  | used 33 times in 2 of 53 sessions, 0 errors, last 2026-11-15, suggest: port |
 | `game_duplicate` | not yet |  | never used in 53 sessions, suggest: not needed |
-| `game_read` | not yet | [#7](https://github.com/lanka-community/arma-reforger-tools-mcp/issues/7) | used 34 times in 3 of 53 sessions, 21 errors, last 2026-11-15, suggest: port |
+| `game_read` | ported | [tool game_read](../src/game-files/tools.rs) | used 34 times in 3 of 53 sessions, 21 errors, last 2026-11-15, suggest: port |
 | `gamemode_scaffold` | not yet |  | never used in 53 sessions, suggest: not needed |
 | `layout_create` | not yet |  | never used in 53 sessions, suggest: not needed |
 | `layout_recipe` | not yet |  | never used in 53 sessions, suggest: not needed |
