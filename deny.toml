@@ -3,7 +3,11 @@ all-features = true
 
 [advisories]
 yanked = "deny"
-ignore = []
+ignore = [
+    # chrono is unmaintained, with no known security hole. rmcp always needs it, through its
+    # own dependency and the schemars feature "chrono04", so no feature setting removes it.
+    { id = "RUSTSEC-2026-0543", reason = "Transitive dependency via rmcp/schemars. Advisory is for unmaintained status, not a security vulnerability. Revisit after rmcp updates." },
+]
 
 [licenses]
 # Permissive licences only. A crate with two licences passes through its permissive one.
