@@ -61,3 +61,10 @@
 - Workbench needs Steam with a logged-in user, and it does not start Steam itself. On Workbench 1.6 without Steam, it logged `SteamAPI_Init failed. Is Steam running?` and closed after 9 seconds, so `workbench_launch` waited 180 seconds for nothing.
 - Now, when `ActiveUser` in `HKCU\Software\Valve\Steam\ActiveProcess` is 0, the Tool starts `steam.exe -silent` and waits for a user (at most 120 seconds), then starts Workbench. A Steam folder with no `steam.exe` gives the "install Steam" error.
 - Real test, BridgeTest from WSL with Steam closed: Steam had a logged-in user after 8 seconds, and the whole call took 13 seconds.
+
+## game_read (#7)
+
+- Ported `game_read` from the old `src/tools/game-read.ts` and the file read of `src/pak/vfs.ts`. It reads the .pak files of the game and of the downloaded mods, with the index that `game_find` builds.
+- Fixed: a compressed file is unpacked with zlib, not raw deflate (the old "invalid block type"), and the full size is checked against a 64 MB limit before memory is reserved. A real test opens every 20th script of the game.
+- Changed: capital letters in the path do not matter, and a wrong path gives the 5 closest real paths. In the old project, 27 of 42 reads failed on guessed paths. A binary file is found by a zero byte, not by a list of extensions. `source` picks the game or a mod when both have the path.
+- Not ported: the read of loose files outside the .pak files. The installed game has only .pak files.

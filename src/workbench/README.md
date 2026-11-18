@@ -19,7 +19,7 @@ The Workbench bridge: it calls the Handler script of this plugin in a Workbench 
   - It started Workbench with the mod, and the mod is loaded: the answer of `workbench_status`, after "Workbench started with the mod ...".
   - The project list has no mod: it starts the Workbench launcher, so the user can create or add a mod.
 
-  When no user is logged in to Steam, it starts Steam first and waits for a login (at most 120 seconds), because Workbench closes without Steam. The answer then starts with "No user was logged in to Steam, so workbench_launch started Steam."
+  When no user is logged in to Steam, it starts Steam first and waits for a login (at most 120 seconds), because Workbench closes without Steam. The answer then starts with "No user was logged in to Steam, so `workbench_launch` started Steam."
 
   Errors, each with the next step: Steam, Arma Reforger Tools, or the game is not installed (with the `steam://install/<app>` link); PowerShell did not start Steam, or no user logged in to Steam in time; `mod` is not in the project list, or it is empty and the list has more than one mod (the answer lists the mods); PowerShell did not start Workbench; the NET API did not answer in time; the scripts did not compile in time; or Workbench did not load the mod. In the last case the answer gives the errors of the Workbench log, for example `Addon 'BridgeTest' dependency '672B195EAD3036D4' can't be added`.
 

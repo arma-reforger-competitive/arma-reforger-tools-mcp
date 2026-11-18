@@ -31,6 +31,108 @@ fn lists_the_path_of_every_file_in_its_folders() {
 }
 
 #[test]
+fn reads_the_full_text_of_a_stored_and_of_a_compressed_file() {
+    // -- Setup & Fixtures
+    // The game stores most scripts compressed with zlib and some files as they are. A test with
+    // one kind only cannot find a wrong offset or a wrong unpack method for the other.
+    let stored = b"class Player {}\n".repeat(40);
+    let compressed = b"class Vehicle {}\n".repeat(400);
+    let pak = PakBuilder::new()
+        .dir("", 2)
+        .file("Player.c", &stored)
+        .compressed_file("Vehicle.c", &compressed)
+        .build();
+    let files = list(&pak).unwrap();
+
+    // -- Exec
+    let texts: Vec<Vec<u8>> = files
+        .iter()
+        .map(|file| read_file(&mut Cursor::new(&pak), file.data).unwrap())
+        .collect();
+
+    // -- Check
+    assert!(usize::try_from(files[1].data.stored()).unwrap() < compressed.len());
+    assert_eq!(texts, [stored, compressed]);
+}
+
+#[test]
+fn gives_an_error_before_it_unpacks_a_file_with_a_full_size_above_the_limit() {
+    // -- Setup & Fixtures
+    let pak = PakBuilder::new()
+        .dir("", 1)
+        .packed_file("huge.c", b"x", u32::MAX)
+        .build();
+    let files = list(&pak).unwrap();
+
+    // -- Exec
+    let result = read_file(&mut Cursor::new(&pak), files[0].data);
+
+    // -- Check
+    assert!(
+        matches!(
+            result,
+            Err(Error::FileTooLarge {
+                len: u32::MAX,
+                max: MAX_FILE_BYTES
+            })
+        ),
+        "{result:?}"
+    );
+}
+
+#[test]
+fn gives_an_error_when_a_file_unpacks_to_another_size_than_its_full_size() {
+    // -- Setup & Fixtures
+    let mut encoder = flate2::write::ZlibEncoder::new(Vec::new(), flate2::Compression::default());
+    std::io::Write::write_all(&mut encoder, b"class Vehicle {}").unwrap();
+    let packed = encoder.finish().unwrap();
+    let pak = PakBuilder::new()
+        .dir("", 2)
+        .packed_file("short.c", &packed, 100)
+        .packed_file("long.c", &packed, 5)
+        .build();
+    let files = list(&pak).unwrap();
+
+    // -- Exec
+    let results: Vec<_> = files
+        .iter()
+        .map(|file| read_file(&mut Cursor::new(&pak), file.data))
+        .collect();
+
+    // -- Check
+    assert!(
+        matches!(results[0], Err(Error::WrongSize { len: 100, got: 16 })),
+        "{:?}",
+        results[0]
+    );
+    assert!(
+        matches!(results[1], Err(Error::WrongSize { len: 5, got: 6 })),
+        "{:?}",
+        results[1]
+    );
+}
+
+#[test]
+fn gives_an_error_for_compressed_bytes_that_are_raw_deflate_without_the_zlib_header() {
+    // -- Setup & Fixtures
+    let mut encoder =
+        flate2::write::DeflateEncoder::new(Vec::new(), flate2::Compression::default());
+    std::io::Write::write_all(&mut encoder, b"class Vehicle {}").unwrap();
+    let raw = encoder.finish().unwrap();
+    let pak = PakBuilder::new()
+        .dir("", 1)
+        .packed_file("raw.c", &raw, 16)
+        .build();
+    let files = list(&pak).unwrap();
+
+    // -- Exec
+    let result = read_file(&mut Cursor::new(&pak), files[0].data);
+
+    // -- Check
+    assert!(matches!(result, Err(Error::Unpack(_))), "{result:?}");
+}
+
+#[test]
 fn reads_the_file_offset_as_a_position_from_the_start_of_the_pak() {
     // -- Setup & Fixtures
     // The file is the last 100 bytes of the DATA chunk. Read from the start of DATA, the same
@@ -180,6 +282,22 @@ proptest! {
     }
 
     #[test]
+    fn gives_an_answer_for_random_compressed_bytes(
+        packed in vec(any::<u8>(), 0..512),
+        len in 0..4096_u32,
+    ) {
+        // -- Setup & Fixtures
+        let pak = PakBuilder::new().dir("", 1).packed_file("a.c", &packed, len).build();
+        let files = list(&pak).unwrap();
+
+        // -- Exec & Check
+        // An answer of any kind, with no panic, is the property. A success has the full size.
+        if let Ok(content) = read_file(&mut Cursor::new(&pak), files[0].data) {
+            prop_assert_eq!(content.len(), usize::try_from(len).unwrap());
+        }
+    }
+
+    #[test]
     fn stops_with_an_answer_for_random_numbers_in_a_real_layout(
         counts in vec(any::<u32>(), 3),
         numbers in vec(any::<u32>(), 3),
@@ -203,6 +321,10 @@ proptest! {
 // -- Test Support
 
 fn read(pak: &[u8]) -> Result<Vec<String>> {
+    Ok(list(pak)?.into_iter().map(|file| file.path).collect())
+}
+
+fn list(pak: &[u8]) -> Result<Vec<PakFile>> {
     list_files(&mut Cursor::new(pak), u64::try_from(pak.len()).unwrap())
 }
 

@@ -1,11 +1,14 @@
-//! Reads the list of files in a .pak archive of the game or of a mod.
+//! Reads the list of files in a .pak archive of the game or of a mod, and the content of one file.
 //!
 //! A .pak file is a FORM PAC1 container of chunks: HEAD, DATA with the file contents, and FILE
-//! with a tree of folder and file entries. Translated from `src/pak/reader.ts` of enfusion-mcp.
-//! Changed: the `offset` of a file is a position from the start of the .pak file, not from the
-//! DATA chunk, and every size, offset, and count is checked against the file length.
+//! with a tree of folder and file entries. Translated from `src/pak/reader.ts` and
+//! `src/pak/vfs.ts` of enfusion-mcp. Changed: the `offset` of a file is a position from the start
+//! of the .pak file, not from the DATA chunk; a compressed file is zlib with a header, not raw
+//! deflate; and every size, offset, and count is checked against the file length or a limit.
 
 use std::io::{Read, Seek, SeekFrom};
+
+use flate2::read::ZlibDecoder;
 
 use super::{Error, Result};
 
@@ -25,11 +28,42 @@ const MIN_ENTRY_BYTES: u64 = 6;
 /// use, 2 bytes we do not use, compressed flag, compression level, and time stamp.
 const FILE_FIELDS_BYTES: usize = 24;
 
+/// The largest full size of a file that the reader unpacks. Without a limit, a damaged FILE table
+/// could make the reader reserve up to 4 GB.
+pub(super) const MAX_FILE_BYTES: u32 = 64 * 1024 * 1024;
+
 const FOLDER: u8 = 0;
 const FILE: u8 = 1;
 
-/// Lists the path of every file in the .pak archive `pak`, which is `len` bytes long.
-pub(super) fn list_files<R: Read + Seek>(pak: &mut R, len: u64) -> Result<Vec<String>> {
+/// One file in a .pak archive.
+pub(super) struct PakFile {
+    pub(super) path: String,
+    pub(super) data: FileData,
+}
+
+/// Where the content of a file lies in its .pak archive. The reader checked that it lies inside.
+#[derive(Clone, Copy, Debug)]
+pub(super) struct FileData {
+    /// The position of the first byte, from the start of the .pak file.
+    offset: u64,
+
+    /// The bytes in the .pak file: the compressed size, or the full size of a stored file.
+    stored: u32,
+
+    /// The full size after unpacking.
+    len: u32,
+    compressed: bool,
+}
+
+impl FileData {
+    #[cfg(test)]
+    pub(super) fn stored(self) -> u32 {
+        self.stored
+    }
+}
+
+/// Lists every file in the .pak archive `pak`, which is `len` bytes long.
+pub(super) fn list_files<R: Read + Seek>(pak: &mut R, len: u64) -> Result<Vec<PakFile>> {
     let table = read_file_table(pak, len)?;
     let mut table = Table {
         rest: &table,
@@ -44,6 +78,38 @@ pub(super) fn list_files<R: Read + Seek>(pak: &mut R, len: u64) -> Result<Vec<St
     let count = table.child_count(&path)?;
     table.read_children(count, &mut path, 1, &mut files)?;
     Ok(files)
+}
+
+/// Reads the full content of the file at `data` in the .pak archive `pak`. A compressed file is
+/// unpacked with zlib. A full size above `MAX_FILE_BYTES` is an error before any memory is
+/// reserved, and an unpacked size that differs from the full size in the FILE table is an error.
+pub(super) fn read_file<R: Read + Seek>(pak: &mut R, data: FileData) -> Result<Vec<u8>> {
+    if data.len > MAX_FILE_BYTES {
+        return Err(Error::FileTooLarge {
+            len: data.len,
+            max: MAX_FILE_BYTES,
+        });
+    }
+    pak.seek(SeekFrom::Start(data.offset))?;
+    let stored = pak.take(u64::from(data.stored));
+    let mut content = Vec::with_capacity(usize::try_from(data.len).unwrap_or_default());
+    // One byte more than the full size shows a file that unpacks to more than it says.
+    let limit = u64::from(data.len) + 1;
+    if data.compressed {
+        ZlibDecoder::new(stored)
+            .take(limit)
+            .read_to_end(&mut content)
+            .map_err(Error::Unpack)?;
+    } else {
+        stored.take(limit).read_to_end(&mut content)?;
+    }
+    if content.len() != usize::try_from(data.len).unwrap_or(usize::MAX) {
+        return Err(Error::WrongSize {
+            len: data.len,
+            got: content.len(),
+        });
+    }
+    Ok(content)
 }
 
 // region:    --- Support
@@ -99,7 +165,7 @@ impl<'a> Table<'a> {
         count: u32,
         path: &mut String,
         depth: usize,
-        files: &mut Vec<String>,
+        files: &mut Vec<PakFile>,
     ) -> Result<()> {
         for _ in 0..count {
             let (kind, name) = self.entry_head()?;
@@ -126,8 +192,11 @@ impl<'a> Table<'a> {
                     self.read_children(count, path, depth + 1, files)?;
                 }
                 FILE => {
-                    self.check_file(path)?;
-                    files.push(path.clone());
+                    let data = self.file_data(path)?;
+                    files.push(PakFile {
+                        path: path.clone(),
+                        data,
+                    });
                 }
                 kind => {
                     return Err(Error::BadEntryKind {
@@ -167,7 +236,7 @@ impl<'a> Table<'a> {
     }
 
     /// Reads the fields of the file `path` and checks that its data lies inside the .pak file.
-    fn check_file(&mut self, path: &str) -> Result<()> {
+    fn file_data(&mut self, path: &str) -> Result<FileData> {
         let [
             o0,
             o1,
@@ -195,10 +264,12 @@ impl<'a> Table<'a> {
             _,
         ] = *self.take::<FILE_FIELDS_BYTES>()?;
         let offset = u64::from(u32::from_le_bytes([o0, o1, o2, o3]));
-        let stored = if compressed == 0 {
-            u32::from_le_bytes([l0, l1, l2, l3])
-        } else {
+        let len = u32::from_le_bytes([l0, l1, l2, l3]);
+        let compressed = compressed != 0;
+        let stored = if compressed {
             u32::from_le_bytes([c0, c1, c2, c3])
+        } else {
+            len
         };
         let end = offset + u64::from(stored);
         if end > self.pak_len {
@@ -208,7 +279,12 @@ impl<'a> Table<'a> {
                 len: self.pak_len,
             });
         }
-        Ok(())
+        Ok(FileData {
+            offset,
+            stored,
+            len,
+            compressed,
+        })
     }
 
     fn take<const N: usize>(&mut self) -> Result<&'a [u8; N]> {
