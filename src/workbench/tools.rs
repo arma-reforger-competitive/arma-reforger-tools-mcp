@@ -147,17 +147,18 @@ async fn launch_answer(bridge: &Bridge, wanted: Option<&str>) -> CallToolResult 
         Ok(Launched::AlreadyRunning) => {
             "Workbench was running already, so workbench_launch started nothing.".to_owned()
         }
-        Ok(Launched::Started { project }) => format!(
-            "Workbench started with the mod {} and compiled the scripts.",
+        Ok(Launched::Started { project, steam }) => format!(
+            "{}Workbench started with the mod {} and compiled the scripts.",
+            steam_started(steam),
             project.id
         ),
-        Ok(Launched::StartedLauncher) => {
-            return answer(Report::normal(
-                "Workbench started on its launcher, because the project list of Workbench has \
+        Ok(Launched::StartedLauncher { steam }) => {
+            return answer(Report::normal(format!(
+                "{}Workbench started on its launcher, because the project list of Workbench has \
                  no mod. Ask the user to create a mod there (Create New) or to add one (Add \
-                 Existing). Then call workbench_status."
-                    .to_owned(),
-            ));
+                 Existing). Then call workbench_status.",
+                steam_started(steam)
+            )));
         }
         Err(error) => return answer(Report::error(&error)),
     };
@@ -166,6 +167,15 @@ async fn launch_answer(bridge: &Bridge, wanted: Option<&str>) -> CallToolResult 
         text: format!("{started} {}", report.text),
         is_error: report.is_error,
     })
+}
+
+/// The start of the answer when `workbench_launch` started Steam.
+fn steam_started(steam: bool) -> &'static str {
+    if steam {
+        "No user was logged in to Steam, so workbench_launch started Steam. "
+    } else {
+        ""
+    }
 }
 
 impl Report {

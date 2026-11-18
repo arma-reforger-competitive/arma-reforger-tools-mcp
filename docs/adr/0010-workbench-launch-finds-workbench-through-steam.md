@@ -6,6 +6,7 @@ ADR 0009 named three costs of a start: a path setting or a guess for the program
 
 - **The program and the game.** Steam knows both. The registry names the Steam folder, `libraryfolders.vdf` names the library of each app, and `appmanifest_<app>.acf` names its folder. When an app is missing, the Tool gives the `steam://install/<app>` link.
 - **The project.** The project list of Workbench names the user's mods. The Tool takes the one mod, or the mod that Claude names, and never a packed project (the game or a Workshop mod).
+- **Steam.** Workbench needs Steam with a logged-in user, and it does not start Steam itself: on Workbench 1.6 without Steam it logs `SteamAPI_Init failed. Is Steam running?` and closes. While a user is logged in, `ActiveUser` in `HKCU\Software\Valve\Steam\ActiveProcess` is not 0. When it is 0, the Tool starts `steam.exe -silent` from the Steam folder and waits for a user.
 - **The dependencies.** A start with `-gproj` looks only in the `addons` folders of the game and of Documents. On Workbench 1.6, BridgeTest with a dependency in `D:\DownloadedMods\addons` did not load (`dependency '672B195EAD3036D4' can't be added`). With `-addonsDir D:\DownloadedMods\addons` it loaded. The folder comes from `REFORGER_WORKBENCH_PROFILE_PATH`, the setting that `game_find` already reads, so no links are needed.
 
 ## Considered

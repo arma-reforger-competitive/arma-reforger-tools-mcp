@@ -56,8 +56,11 @@ pub(super) struct Settings {
     /// The Steam folder in Windows form. `None`: the folder that the Windows registry names.
     pub(super) steam: Option<String>,
 
-    /// How `workbench_launch` starts the Workbench program.
+    /// How `workbench_launch` starts Workbench and Steam, and reads the Steam login.
     pub(super) starter: Starter,
+
+    /// How long `workbench_launch` waits for a user to log in to a Steam that it started.
+    pub(super) steam_timeout: Duration,
 
     /// How long `workbench_launch` waits for the scripts of a started Workbench.
     pub(super) start_timeout: Duration,
@@ -66,14 +69,15 @@ pub(super) struct Settings {
     pub(super) poll_interval: Duration,
 }
 
-/// How `workbench_launch` starts the Workbench program.
+/// How `workbench_launch` starts Workbench and Steam, and reads the Steam login.
 pub(super) enum Starter {
-    /// With `Start-Process` of the PowerShell of Windows, apart from the server.
+    /// With `Start-Process` of the PowerShell of Windows, apart from the server, and the Windows
+    /// registry.
     PowerShell,
 
-    /// A test gets the start command and fakes the start.
+    /// A test fakes the starts and the Steam login.
     #[cfg(test)]
-    Test(std::sync::Arc<dyn Fn(&super::launch::StartCommand) + Send + Sync>),
+    Test(std::sync::Arc<super::launch::FakeWindows>),
 }
 
 /// The value of the port setting.
@@ -106,6 +110,7 @@ impl Settings {
             reload_timeout: Duration::from_secs(120),
             steam: None,
             starter: Starter::PowerShell,
+            steam_timeout: Duration::from_secs(120),
             start_timeout: Duration::from_secs(180),
             poll_interval: Duration::from_secs(2),
         }

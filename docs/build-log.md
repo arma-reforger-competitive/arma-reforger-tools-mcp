@@ -55,3 +55,9 @@
 - Changed: it finds Workbench and the game through Steam (the registry, `libraryfolders.vdf`, `appmanifest_<app>.acf`), with no path setting (ADR 0010). A missing app gives its `steam://install/<app>` link. It takes the mod from the project list of Workbench, by ID or folder name, and never a packed project: the game or a Workshop mod.
 - Changed: in place of the old dependency links, the start adds `-addonsDir` from `REFORGER_WORKBENCH_PROFILE_PATH`. A test on Workbench 1.6 showed that a `-gproj` start without it does not load a mod whose Workshop dependency is in a moved download folder. The Tool now checks that the mod loaded and gives the errors of the Workbench log when it did not.
 - Real test, BridgeTest from WSL: loaded and compiled in 8 to 15 seconds; with a Workshop dependency, loaded only with `-addonsDir`.
+
+## workbench_launch starts Steam
+
+- Workbench needs Steam with a logged-in user, and it does not start Steam itself. On Workbench 1.6 without Steam, it logged `SteamAPI_Init failed. Is Steam running?` and closed after 9 seconds, so `workbench_launch` waited 180 seconds for nothing.
+- Now, when `ActiveUser` in `HKCU\Software\Valve\Steam\ActiveProcess` is 0, the Tool starts `steam.exe -silent` and waits for a user (at most 120 seconds), then starts Workbench. A Steam folder with no `steam.exe` gives the "install Steam" error.
+- Real test, BridgeTest from WSL with Steam closed: Steam had a logged-in user after 8 seconds, and the whole call took 13 seconds.

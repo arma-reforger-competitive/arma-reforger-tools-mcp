@@ -2,6 +2,11 @@
 //! folder (`HKCU\Software\Valve\Steam`, value `SteamPath`). In it, `steamapps/libraryfolders.vdf`
 //! names each library folder and the apps in it, and `steamapps/appmanifest_<app>.acf` in a
 //! library names the folder of the app under `steamapps/common`.
+//!
+//! Workbench needs a running Steam with a logged-in user, and it does not start Steam itself. On
+//! Workbench 1.6 without Steam, it logs `SteamAPI_Init failed. Is Steam running?` and closes.
+//! While a user is logged in, Steam writes a value other than 0 to `ActiveUser` in
+//! `HKCU\Software\Valve\Steam\ActiveProcess`, and 0 when Steam is closed.
 
 use std::fs;
 use std::path::PathBuf;
@@ -14,6 +19,12 @@ use crate::host_path::host_path;
 
 /// The registry key of Steam for the user.
 const STEAM_KEY: &str = r"HKCU\Software\Valve\Steam";
+
+/// The registry key that Steam writes while it runs.
+const ACTIVE_PROCESS_KEY: &str = r"HKCU\Software\Valve\Steam\ActiveProcess";
+
+/// The Steam program in the Steam folder.
+const STEAM_EXE: &str = "steam.exe";
 
 /// The Workbench program in the folder of Arma Reforger Tools.
 const WORKBENCH_EXE: &str = r"Workbench\ArmaReforgerWorkbenchSteamDiag.exe";
@@ -28,10 +39,12 @@ pub(super) enum App {
     Game,
 }
 
-/// The Workbench program and the game folder, in Windows form, for the start command.
+/// The Workbench program, the game folder, and the Steam program, in Windows form, for the
+/// start commands.
 pub(super) struct Install {
     pub(super) workbench: String,
     pub(super) game: String,
+    pub(super) steam: String,
 }
 
 impl App {
@@ -52,13 +65,16 @@ impl App {
     }
 }
 
-/// Finds the Workbench program and the game folder. `steam` is the Steam folder in Windows form,
+/// Finds the Workbench program, the game folder, and the Steam program. `steam` is the Steam folder in Windows form,
 /// or `None` to read it from the registry.
 pub(super) async fn find_install(steam: Option<&str>) -> Result<Install> {
     let steam = match steam {
         Some(steam) => steam.to_owned(),
         None => steam_from_registry().await?,
     };
+    if !host_path(&steam).join(STEAM_EXE).is_file() {
+        return Err(NoStart::NoSteam.into());
+    }
     let library = fs::read_to_string(host_path(&steam).join("steamapps/libraryfolders.vdf"))
         .map_err(|_| NoStart::NoSteam)?;
     let (tools, tools_here) = app_folder(&library, App::Tools)?;
@@ -69,7 +85,21 @@ pub(super) async fn find_install(steam: Option<&str>) -> Result<Install> {
     Ok(Install {
         workbench: format!(r"{tools}\{WORKBENCH_EXE}"),
         game,
+        steam: format!(r"{steam}\{STEAM_EXE}"),
     })
+}
+
+/// True when a user is logged in to Steam. A missing key or value counts as no user: Steam never
+/// ran.
+pub(super) async fn steam_logged_in() -> bool {
+    let Ok(output) = Command::new("reg.exe")
+        .args(["query", ACTIVE_PROCESS_KEY, "/v", "ActiveUser"])
+        .output()
+        .await
+    else {
+        return false;
+    };
+    active_user(&String::from_utf8_lossy(&output.stdout))
 }
 
 // region:    --- Support
@@ -120,6 +150,16 @@ fn app_folder(library: &str, app: App) -> Result<(String, PathBuf)> {
     Ok((format!(r"{root}\steamapps\common\{folder}"), here))
 }
 
+/// True when the output of `reg.exe query` names an `ActiveUser` other than 0.
+fn active_user(output: &str) -> bool {
+    output
+        .lines()
+        .filter(|line| line.trim_start().starts_with("ActiveUser"))
+        .find_map(|line| line.split_once("REG_DWORD")?.1.trim().strip_prefix("0x"))
+        .and_then(|hex| u32::from_str_radix(hex, 16).ok())
+        .is_some_and(|user| user != 0)
+}
+
 /// The key and the value of a line `"key"  "value"` in a Steam file. A `\\` in the value is one
 /// `\`.
 fn pair(line: &str) -> Option<(String, String)> {
@@ -161,6 +201,7 @@ pub(super) fn write_steam(steam: &std::path::Path, apps: &[App]) -> PathBuf {
         }
     }
     library.push_str("\t\t}\n\t}\n}\n");
+    fs::write(steam.join(STEAM_EXE), "").unwrap();
     fs::write(steam.join("steamapps/libraryfolders.vdf"), library).unwrap();
     steam.to_owned()
 }
@@ -187,6 +228,24 @@ mod tests {
                 ("1874910".to_owned(), "725716903".to_owned())
             ]
         );
+    }
+
+    #[test]
+    fn reads_the_logged_in_user_from_the_registry() {
+        // -- Setup & Fixtures
+        // The output of `reg.exe query` on Windows 11 with Steam 2026, closed and logged in.
+        let answer = |user: &str| {
+            format!(
+                "\r\nHKEY_CURRENT_USER\\Software\\Valve\\Steam\\ActiveProcess\r\n    ActiveUser    REG_DWORD    {user}\r\n\r\n"
+            )
+        };
+
+        // -- Exec & Check
+        assert!(active_user(&answer("0x37cfa8c0")));
+        assert!(!active_user(&answer("0x0")));
+        assert!(!active_user(
+            "ERROR: The system was unable to find the specified registry key or value.\r\n"
+        ));
     }
 }
 
