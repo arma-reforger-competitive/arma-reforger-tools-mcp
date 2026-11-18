@@ -4,7 +4,8 @@
 use std::fmt;
 use std::path::PathBuf;
 
-use super::settings::{Address, DOCUMENTS_SETTING, HOST_SETTING, PORT_SETTING};
+use super::settings::{Address, DOCUMENTS_SETTING, DOWNLOADS_SETTING, HOST_SETTING, PORT_SETTING};
+use super::steam::App;
 
 /// Where users report a bug of the plugin.
 const ISSUES_URL: &str = "https://github.com/lanka-community/arma-reforger-tools-mcp/issues";
@@ -73,6 +74,12 @@ pub enum Error {
         folder: PathBuf,
         err: std::io::Error,
     },
+
+    // -- The start
+    /// `workbench_launch` did not start Workbench, or Workbench did not get ready.
+    NoStart {
+        reason: NoStart,
+    },
 }
 
 /// Why the bridge did not find the folder of the open mod project.
@@ -86,6 +93,49 @@ pub enum NoProject {
 
     /// More than one loaded project in the list, and none of them needs the others.
     Many { folders: Vec<PathBuf> },
+}
+
+/// Why `workbench_launch` did not start Workbench, or why Workbench did not get ready.
+#[derive(Debug)]
+pub enum NoStart {
+    /// The registry names no Steam folder, or the folder has no library file.
+    NoSteam,
+
+    NotInstalled {
+        app: App,
+    },
+
+    /// The project list has no mod with the name that Claude gave.
+    UnknownMod {
+        wanted: String,
+        names: Vec<String>,
+    },
+
+    /// Claude gave no mod, and the project list has more than one.
+    ChooseMod {
+        names: Vec<String>,
+    },
+
+    /// PowerShell could not start Workbench.
+    StartFailed {
+        err: std::io::Error,
+    },
+
+    /// The NET API did not answer in time after the start.
+    NoNetApi {
+        secs: u64,
+    },
+
+    /// The NET API answered, but the scripts were not compiled in time.
+    NotCompiled {
+        secs: u64,
+    },
+
+    /// Workbench started, but it did not load the mod. `errors`: the errors in its log.
+    NotLoaded {
+        id: String,
+        errors: Vec<String>,
+    },
 }
 
 /// Why an answer is not a NET API answer.
@@ -114,9 +164,9 @@ impl fmt::Display for Error {
         match self {
             Self::NotRunning { address } => write!(
                 f,
-                "Workbench is not running: nothing answers on {address}. Start Workbench and \
-                 open your mod. If Workbench runs, check that File > Options > General > Net API \
-                 is on, and that {HOST_SETTING} and {PORT_SETTING} match it. Without \
+                "Workbench is not running: nothing answers on {address}. Call workbench_launch to \
+                 start it with your mod. If Workbench runs, check that File > Options > General > \
+                 Net API is on, and that {HOST_SETTING} and {PORT_SETTING} match it. Without \
                  {HOST_SETTING}, the bridge uses the Windows host under WSL and 127.0.0.1 on \
                  Windows. Without {PORT_SETTING}, it uses 5775."
             ),
@@ -188,6 +238,7 @@ impl fmt::Display for Error {
                  Claude Code."
             ),
             Self::NoProject { reason } => write!(f, "{reason}"),
+            Self::NoStart { reason } => write!(f, "{reason}"),
             Self::InstallFailed { folder, err } => write!(
                 f,
                 "The bridge could not copy the Handler script into {}: {err}. Check that the \
@@ -231,6 +282,83 @@ impl fmt::Display for NoProject {
     }
 }
 
+impl fmt::Display for NoStart {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::NoSteam => write!(
+                f,
+                "The bridge did not find Steam: the Windows registry names no Steam folder \
+                 (HKCU\\Software\\Valve\\Steam, SteamPath), or the folder has no \
+                 steamapps\\libraryfolders.vdf. Install Steam, sign in, and install Arma Reforger \
+                 and Arma Reforger Tools. Then call workbench_launch again."
+            ),
+            Self::NotInstalled { app } => write!(
+                f,
+                "{} is not installed in Steam. Install it: open steam://install/{} in a browser, \
+                 or find {} in the Steam library and click Install. Then call workbench_launch \
+                 again.",
+                app.name(),
+                app.id(),
+                app.name()
+            ),
+            Self::UnknownMod { wanted, names } if names.is_empty() => write!(
+                f,
+                "The project list of Workbench has no mod \"{wanted}\": it has no mods. Call \
+                 workbench_launch without a mod to open the Workbench launcher, and create the \
+                 mod there."
+            ),
+            Self::UnknownMod { wanted, names } => write!(
+                f,
+                "The project list of Workbench has no mod \"{wanted}\". Its mods: {}. Call \
+                 workbench_launch again with one of them.",
+                names.join(", ")
+            ),
+            Self::ChooseMod { names } => write!(
+                f,
+                "The project list of Workbench has more than one mod: {}. Call workbench_launch \
+                 again with `mod` set to one of them.",
+                names.join(", ")
+            ),
+            Self::StartFailed { err } => write!(
+                f,
+                "The bridge could not start Workbench through PowerShell: {err}. Start Arma \
+                 Reforger Tools from Steam yourself, open your mod, and call workbench_status."
+            ),
+            Self::NoNetApi { secs } => write!(
+                f,
+                "Workbench was started, but its NET API did not answer in {secs} seconds. In \
+                 Workbench, turn on File > Options > General > Net API, and check that \
+                 {HOST_SETTING} and {PORT_SETTING} match it. Then call workbench_status."
+            ),
+            Self::NotCompiled { secs } => write!(
+                f,
+                "Workbench was started, but its scripts were not compiled after {secs} seconds. \
+                 Open the Script Editor in Workbench, press F7 to see the errors, fix them, and \
+                 call workbench_status."
+            ),
+            Self::NotLoaded { id, errors } => {
+                write!(
+                    f,
+                    "Workbench started, but it did not load the mod {id}: it has only the game \
+                     open. "
+                )?;
+                if errors.is_empty() {
+                    write!(f, "The Workbench log has no errors. ")?;
+                } else {
+                    write!(f, "Errors in the Workbench log: {}. ", errors.join("; "))?;
+                }
+                write!(
+                    f,
+                    "When a dependency \"can't be added\", Workbench did not find that mod. If the \
+                     user moved the folder of the downloaded mods, set {DOWNLOADS_SETTING} to the \
+                     folder that holds its addons folder. Else download the dependency in the \
+                     Workbench launcher. Then close Workbench and call workbench_launch again."
+                )
+            }
+        }
+    }
+}
+
 impl fmt::Display for Garbled {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
@@ -261,7 +389,8 @@ impl std::error::Error for Error {
             | Self::BadPort { .. }
             | Self::NoWindowsHost
             | Self::DocumentsNotFound
-            | Self::NoProject { .. } => None,
+            | Self::NoProject { .. }
+            | Self::NoStart { .. } => None,
         }
     }
 }
@@ -271,6 +400,12 @@ impl std::error::Error for Error {
 impl From<Garbled> for Error {
     fn from(garbled: Garbled) -> Self {
         Self::BadAnswer { garbled }
+    }
+}
+
+impl From<NoStart> for Error {
+    fn from(reason: NoStart) -> Self {
+        Self::NoStart { reason }
     }
 }
 

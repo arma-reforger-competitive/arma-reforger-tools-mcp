@@ -45,7 +45,7 @@ History: 53 sessions with the old server, from 2026-11-05 to 2026-11-15.
 | `wb_entity_select` | not yet |  | never used in 53 sessions, suggest: not needed |
 | `wb_execute_action` | not yet |  | never used in 53 sessions, suggest: not needed |
 | `wb_knowledge` | not yet |  | never used in 53 sessions, suggest: not needed |
-| `wb_launch` | not yet | [#61](https://github.com/lanka-community/arma-reforger-tools-mcp/issues/61) | never used in 53 sessions, suggest: not needed |
+| `wb_launch` | ported | [tool workbench_launch](../src/workbench/tools.rs) | never used in 53 sessions, suggest: not needed |
 | `wb_layers` | not yet |  | never used in 53 sessions, suggest: not needed |
 | `wb_localization` | not yet |  | never used in 53 sessions, suggest: not needed |
 | `wb_open_resource` | not yet |  | never used in 53 sessions, suggest: not needed |

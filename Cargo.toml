@@ -40,7 +40,7 @@ debug = false
 
 [dependencies]
 # -- Async
-tokio = { version = "1.54.1", features = ["macros", "rt", "io-std", "io-util", "net", "time"] }
+tokio = { version = "1.54.1", features = ["macros", "rt", "io-std", "io-util", "net", "process", "time"] }
 tokio-util = { version = "0.7.20", default-features = false }
 # -- MCP
 rmcp = { version = "3.10.0", features = ["transport-io"] }

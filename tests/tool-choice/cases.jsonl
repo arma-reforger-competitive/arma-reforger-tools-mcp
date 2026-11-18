@@ -8,3 +8,5 @@
 {"question":"Find the config files of the game's weapon attachments.","tools":["game_find"]}
 {"question":"Is my Arma Reforger Workbench connected to you right now?","tools":["workbench_status"]}
 {"question":"Which mod do I have open in the Reforger editor at the moment?","tools":["workbench_status"]}
+{"question":"Open Workbench with my mod BridgeTest so I can work on it.","tools":["workbench_launch","workbench_status"]}
+{"question":"Can you fire up the Reforger modding editor for me?","tools":["workbench_launch","workbench_status"]}

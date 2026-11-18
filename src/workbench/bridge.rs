@@ -22,6 +22,9 @@ const LOADED_PROJECTS_FUNC: &str = "GetLoadedProjects";
 /// ends.
 const RELOAD_FUNC: &str = "ReloadScripts";
 
+/// The built-in NET API function that says whether Workbench runs and has compiled its scripts.
+const RUNNING_FUNC: &str = "IsWorkbenchRunning";
+
 /// What `ReloadScripts` answers when a script of the open project has an error.
 const COMPILE_FAILED: &str = "Compilation failed";
 
@@ -76,8 +79,39 @@ impl Bridge {
         Ok((answer, setup))
     }
 
+    /// The settings of the bridge.
+    pub(super) fn settings(&self) -> &Settings {
+        &self.settings
+    }
+
+    /// Whether Workbench has compiled its scripts. `Error::NotRunning` when nothing answers.
+    pub(super) async fn scripts_compiled(&self) -> Result<bool> {
+        match self
+            .call_func(RUNNING_FUNC, self.settings.answer_timeout)
+            .await?
+        {
+            Answer::Ok(answer) => Ok(answer
+                .get("ScriptsCompiled")
+                .and_then(Value::as_bool)
+                .ok_or(Garbled::NoField {
+                    field: "ScriptsCompiled",
+                })?),
+            Answer::UndefinedFunc => Err(Error::WorkbenchFailed {
+                func: RUNNING_FUNC,
+                status: "Undefined API func".to_owned(),
+            }),
+        }
+    }
+
     /// The mod project that is open in Workbench.
     pub(super) async fn open_project(&self) -> Result<Project> {
+        let loaded = self.loaded_projects().await?;
+        open_project(&self.settings.documents()?, &loaded)
+    }
+
+    /// The IDs of the projects that Workbench has loaded: the game, the open mod, and its
+    /// dependencies.
+    pub(super) async fn loaded_projects(&self) -> Result<Vec<String>> {
         let answer = match self
             .call_func(LOADED_PROJECTS_FUNC, self.settings.answer_timeout)
             .await?
@@ -90,7 +124,7 @@ impl Bridge {
                 });
             }
         };
-        let loaded: Vec<String> = answer
+        Ok(answer
             .get("Loaded Projects")
             .and_then(Value::as_array)
             .ok_or(Garbled::NoField {
@@ -98,8 +132,7 @@ impl Bridge {
             })?
             .iter()
             .filter_map(|id| id.as_str().map(str::to_owned))
-            .collect();
-        open_project(&self.settings.documents()?, &loaded)
+            .collect())
     }
 }
 

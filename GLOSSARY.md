@@ -145,7 +145,7 @@ The scripts, Prefabs, and configs inside the installed game's .pak archives.
 _Avoid_: Game data, assets
 
 **Workbench**:
-Bohemia's editor for making Reforger mods.
+Bohemia's editor for making Reforger mods. Steam installs it with the app Arma Reforger Tools (app 1874910), which is not this plugin.
 _Avoid_: Editor, Enfusion Workbench
 
 **Workbench plugin**:
@@ -153,7 +153,7 @@ A script that runs inside Workbench and does a job there when the MCP server ask
 _Avoid_: Plugin (alone)
 
 **Workbench bridge**:
-The connection through which Tools call the Handler script in a Workbench that already runs, over the Workbench NET API. It copies the Handler script and reloads the scripts when needed. It never starts Workbench.
+The connection through which Tools call the Handler script in a Workbench that already runs, over the Workbench NET API. It copies the Handler script and reloads the scripts when needed. It never starts Workbench: only the Tool `workbench_launch` does.
 
 **Handler script**:
 The Workbench plugin of this project: one Enforce Script file that the Workbench bridge copies into the open mod. It answers the calls of the Workbench bridge.

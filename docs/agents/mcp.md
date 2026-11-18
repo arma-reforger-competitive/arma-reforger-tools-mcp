@@ -20,7 +20,7 @@ When a test fails, fix the Tool text and run again. An example in a description 
 
 ## Server guide
 
-The Server guide (`SERVER_GUIDE` in `src/server.rs`) says in a few lines which Tool fits which job. Name each Tool in backticks. When you add, rename, or remove a Tool, change the guide: a test in `tests/server.rs` fails when the guide and the served Tools differ.
+The Server guide (`SERVER_GUIDE` in `src/server.rs`) says in a few lines which Tool fits which job. Name each Tool in backticks. Claude Code loads the input schema of a Tool only when Claude asks for it, so Claude can call a Tool with a guessed input name. When Claude guesses wrong, name the input in backticks in the guide: "`wiki_read`: read one page by its `title`" stopped Claude from sending `page`. When you add, rename, or remove a Tool, change the guide: a test in `tests/server.rs` fails when the guide and the served Tools differ.
 
 ## Tool labels
 
