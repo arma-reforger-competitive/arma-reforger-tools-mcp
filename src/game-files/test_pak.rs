@@ -1,6 +1,10 @@
 //! Builds small .pak files for the tests, with the layout of the real game files.
 
 use std::collections::BTreeMap;
+use std::io::Write as _;
+
+use flate2::Compression;
+use flate2::write::ZlibEncoder;
 
 /// Byte length of the FORM header, the HEAD chunk, and the header of the DATA chunk. The first
 /// file starts here, as in every real .pak file.
@@ -48,6 +52,23 @@ impl PakBuilder {
         let size = u32::try_from(content.len()).unwrap();
         self.data.extend(content);
         self.raw_file(name, offset, size, size, false)
+    }
+
+    /// A file entry with its content compressed with zlib, as the game stores most scripts.
+    pub(super) fn compressed_file(self, name: &str, content: &[u8]) -> Self {
+        let mut encoder = ZlibEncoder::new(Vec::new(), Compression::default());
+        encoder.write_all(content).unwrap();
+        let packed = encoder.finish().unwrap();
+        let len = u32::try_from(content.len()).unwrap();
+        self.packed_file(name, &packed, len)
+    }
+
+    /// A compressed file entry with `packed` as its stored bytes and `len` as its full size.
+    pub(super) fn packed_file(mut self, name: &str, packed: &[u8], len: u32) -> Self {
+        let offset = DATA_START + u32::try_from(self.data.len()).unwrap();
+        let stored = u32::try_from(packed.len()).unwrap();
+        self.data.extend(packed);
+        self.raw_file(name, offset, stored, len, true)
     }
 
     /// A file entry with the numbers given as they are. It adds no content to the DATA chunk.

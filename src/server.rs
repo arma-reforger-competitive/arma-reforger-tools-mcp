@@ -28,6 +28,8 @@ directly.
 - `game_find`: the scripts, Prefabs, and configs of the game and of the Workshop mods that \
 Workbench downloaded. They are inside .pak archives, so grep, find, and file search cannot see \
 them, and they are not in the project folder.
+- `game_read`: open one file of the game or of a downloaded mod by its `path`, and get its full \
+text. When the user gives the path of such a file, call `game_read` directly.
 - `workbench_status`: the live state of the user's running Workbench: whether it runs, whether \
 the Handler script of this plugin is loaded, and which mod is open. For how to do something in \
 Workbench, use the wiki Tools.

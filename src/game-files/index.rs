@@ -2,10 +2,11 @@
 
 use std::fs::{self, File};
 use std::path::{Path, PathBuf};
+use std::sync::Arc;
 
 use tokio_util::sync::CancellationToken;
 
-use super::pak::list_files;
+use super::pak::{FileData, PakFile, list_files, read_file};
 use super::settings::{PROFILE_SETTING, Settings};
 use super::{Error, Result};
 use crate::host_path::host_path;
@@ -30,6 +31,18 @@ pub(super) struct GameFile {
 
     /// The position of its source in `Index::sources`.
     pub(super) source: usize,
+
+    /// The .pak file that holds it.
+    pub(super) pak: Arc<Path>,
+
+    data: FileData,
+}
+
+impl GameFile {
+    /// Reads its full content from its .pak file.
+    pub(super) fn read(&self) -> Result<Vec<u8>> {
+        read_file(&mut File::open(&self.pak)?, self.data)
+    }
 }
 
 /// Reads the file lists of all .pak archives of the game and of the mods. It fails when the game
@@ -112,9 +125,16 @@ impl Index {
                 return Err(Error::Cancelled);
             }
             match read_pak(pak) {
-                Ok(paths) => self
-                    .files
-                    .extend(paths.into_iter().map(|path| GameFile { path, source })),
+                Ok(files) => {
+                    let pak: Arc<Path> = Arc::from(pak.as_path());
+                    self.files
+                        .extend(files.into_iter().map(|PakFile { path, data }| GameFile {
+                            path,
+                            source,
+                            pak: Arc::clone(&pak),
+                            data,
+                        }));
+                }
                 Err(error) => self.notes.push(format!(
                     "Skipped {}: {error}. The file may be damaged: verify the game files in Steam, \
                      or download the mod again.",
@@ -128,7 +148,7 @@ impl Index {
 
 // region:    --- Support
 
-fn read_pak(pak: &Path) -> Result<Vec<String>> {
+fn read_pak(pak: &Path) -> Result<Vec<PakFile>> {
     let mut file = File::open(pak)?;
     let len = file.metadata()?.len();
     list_files(&mut file, len)

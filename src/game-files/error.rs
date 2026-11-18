@@ -58,6 +58,17 @@ pub enum Error {
         len: u64,
     },
 
+    // -- Damaged or large file content
+    FileTooLarge {
+        len: u32,
+        max: u32,
+    },
+    WrongSize {
+        len: u32,
+        got: usize,
+    },
+    Unpack(std::io::Error),
+
     // -- Externals
     Io(std::io::Error),
 }
@@ -81,7 +92,7 @@ impl fmt::Display for Error {
             Self::Cancelled => write!(f, "The call was cancelled before the file lists were read."),
             Self::ReaderStopped => write!(
                 f,
-                "The reader of the .pak files stopped with an error. Call game_find again."
+                "The reader of the .pak files stopped with an error. Call the Tool again."
             ),
             Self::NotAPak => write!(f, "it does not start with a FORM PAC1 header"),
             Self::ChunkOutsidePak { at } => {
@@ -113,6 +124,20 @@ impl fmt::Display for Error {
                 f,
                 "the file \"{path}\" ends at byte {end}, past the end of the .pak file at byte {len}"
             ),
+            Self::FileTooLarge { len, max } => write!(
+                f,
+                "it has {len} bytes, more than the limit of {max} bytes that game_read opens"
+            ),
+            Self::WrongSize { len, got } => write!(
+                f,
+                "the FILE table says it has {len} bytes, but its content has {}",
+                if *got > usize::try_from(*len).unwrap_or(usize::MAX) {
+                    "more".to_owned()
+                } else {
+                    got.to_string()
+                }
+            ),
+            Self::Unpack(err) => write!(f, "its compressed content does not unpack: {err}"),
             Self::Io(err) => write!(f, "{err}"),
         }
     }
@@ -121,7 +146,7 @@ impl fmt::Display for Error {
 impl std::error::Error for Error {
     fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
         match self {
-            Self::Io(err) => Some(err),
+            Self::Io(err) | Self::Unpack(err) => Some(err),
             Self::GamePathNotSet
             | Self::NoGamePaks { .. }
             | Self::Cancelled
@@ -136,7 +161,9 @@ impl std::error::Error for Error {
             | Self::TooManyChildren { .. }
             | Self::TooDeep { .. }
             | Self::PathTooLong { .. }
-            | Self::FileOutsidePak { .. } => None,
+            | Self::FileOutsidePak { .. }
+            | Self::FileTooLarge { .. }
+            | Self::WrongSize { .. } => None,
         }
     }
 }
