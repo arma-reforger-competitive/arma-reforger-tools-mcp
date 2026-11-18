@@ -33,6 +33,8 @@ The **Port ledger** (`docs/port-ledger.md`) lists every feature of the old proje
 
 A port ticket is a GitHub issue in this repo, a sub-issue of the roadmap issue "Roadmap: rebuild enfusion-mcp as the reforger plugin" (#1), with the label `needs-triage`. Its body names the old feature, the owner's reason to port it, and the usage numbers from the report. `docs/agents/issue-tracker.md` in `~/www/home` has the `gh` commands.
 
+Each claim in the body about how Workbench or the engine behaves names its source: a wiki page, a Game file path, or a test run with its result. Write "(unchecked)" after a claim that has no source. The agent that does the Port tests an unchecked claim before it builds on it.
+
 ## Usage evidence
 
 The report reads Claude Code session history in `~/.claude/projects`:
