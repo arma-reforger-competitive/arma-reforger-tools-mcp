@@ -41,3 +41,10 @@
 - Fixed: a file `offset` is a position from the start of the .pak file, not from the DATA chunk. The old reader checked every chunk size, but not the sizes, offsets, and child counts in the FILE table. Now each one is checked, and a property test gives the reader damaged files.
 - Changed: `game_find` also searches the Workshop mods that Workbench downloaded, and names the mod of each path. A class name with `SCR_` also finds the file without the prefix. A damaged .pak file is skipped and named in the answer. The old code skipped it in silence.
 - The settings are `REFORGER_GAME_PATH` and `REFORGER_WORKBENCH_PROFILE_PATH`, in Windows or WSL form. The old `ENFUSION_GAME_PATH` is not read.
+
+## workbench_status (#40)
+
+- Ported the NET API wire format and the TCP call from the old `src/workbench/protocol.ts` and `client.ts`, and the Windows host of WSL from `detectWslHostIp` in `src/utils/wsl-path.ts`. It reads `/proc/net/route` and runs no `ip` command. One new Tool, `workbench_status`, and one Handler script, `ReforgerBridge.c`, in place of the old 20 handler files.
+- Not ported: the start of Workbench, the 30-second poll for a recompile, and the dependency links (ADR 0009). After a copy, the bridge calls the built-in `ReloadScripts` once. A test on Workbench 1.6 showed that it loads a new or changed Handler script with no restart.
+- Changed: the bridge finds the open mod from `GetLoadedProjects` and the project list of Workbench in Documents. The old code guessed it from a project folder setting. Every answer of the Handler script has its version, so an old copy is replaced.
+- Pack test: Workbench packs the Handler script into the mod (`data.pak` of BridgeTest held `Scripts/WorkbenchGame/ReforgerBridge/ReforgerBridge.c`), and has no setting to leave a folder out. The README says to delete the folder before a pack and gives the `.gitignore` line.

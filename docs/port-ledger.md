@@ -31,11 +31,11 @@ History: 53 sessions with the old server, from 2026-11-05 to 2026-11-15.
 | `scenario_create_conflict` | not yet |  | never used in 53 sessions, suggest: not needed |
 | `script_create` | not yet |  | never used in 53 sessions, suggest: not needed |
 | `server_config` | not yet |  | never used in 53 sessions, suggest: not needed |
-| `wb_cleanup` | not yet |  | never used in 53 sessions, suggest: not needed |
+| `wb_cleanup` | not yet | [#62](https://github.com/lanka-community/arma-reforger-tools-mcp/issues/62) | never used in 53 sessions, suggest: not needed |
 | `wb_clipboard` | not yet |  | never used in 53 sessions, suggest: not needed |
 | `wb_component` | not yet |  | never used in 53 sessions, suggest: not needed |
-| `wb_connect` | not yet |  | never used in 53 sessions, suggest: not needed |
-| `wb_diagnose` | not yet |  | never used in 53 sessions, suggest: not needed |
+| `wb_connect` | ported | [tool workbench_status](../src/workbench/tools.rs) | never used in 53 sessions, suggest: not needed |
+| `wb_diagnose` | ported | [tool workbench_status](../src/workbench/tools.rs) | never used in 53 sessions, suggest: not needed |
 | `wb_entity_create` | not yet |  | never used in 53 sessions, suggest: not needed |
 | `wb_entity_delete` | not yet |  | never used in 53 sessions, suggest: not needed |
 | `wb_entity_duplicate` | not yet |  | never used in 53 sessions, suggest: not needed |
@@ -45,18 +45,18 @@ History: 53 sessions with the old server, from 2026-11-05 to 2026-11-15.
 | `wb_entity_select` | not yet |  | never used in 53 sessions, suggest: not needed |
 | `wb_execute_action` | not yet |  | never used in 53 sessions, suggest: not needed |
 | `wb_knowledge` | not yet |  | never used in 53 sessions, suggest: not needed |
-| `wb_launch` | not yet |  | never used in 53 sessions, suggest: not needed |
+| `wb_launch` | not yet | [#61](https://github.com/lanka-community/arma-reforger-tools-mcp/issues/61) | never used in 53 sessions, suggest: not needed |
 | `wb_layers` | not yet |  | never used in 53 sessions, suggest: not needed |
 | `wb_localization` | not yet |  | never used in 53 sessions, suggest: not needed |
 | `wb_open_resource` | not yet |  | never used in 53 sessions, suggest: not needed |
 | `wb_play` | not yet |  | never used in 53 sessions, suggest: not needed |
 | `wb_prefabs` | not yet |  | never used in 53 sessions, suggest: not needed |
 | `wb_projects` | not yet |  | never used in 53 sessions, suggest: not needed |
-| `wb_reload` | not yet |  | never used in 53 sessions, suggest: not needed |
+| `wb_reload` | not needed | the Workbench bridge calls ReloadScripts itself after it copies the Handler script (#40). The old Tool was never used in 53 sessions, and a user compiles their own scripts in the Script Editor (F7). | never used in 53 sessions, suggest: not needed |
 | `wb_resources` | not yet |  | never used in 53 sessions, suggest: not needed |
 | `wb_save` | not yet |  | never used in 53 sessions, suggest: not needed |
 | `wb_script_editor` | not yet |  | never used in 53 sessions, suggest: not needed |
-| `wb_state` | not yet |  | used 1 times in 1 of 53 sessions, 1 errors, last 2026-11-15, suggest: port |
+| `wb_state` | ported | [tool workbench_status](../src/workbench/tools.rs) | used 1 times in 1 of 53 sessions, 1 errors, last 2026-11-15, suggest: port |
 | `wb_stop` | not yet |  | never used in 53 sessions, suggest: not needed |
 | `wb_terrain` | not yet |  | never used in 53 sessions, suggest: not needed |
 | `wb_undo_redo` | not yet |  | never used in 53 sessions, suggest: not needed |

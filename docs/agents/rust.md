@@ -20,6 +20,8 @@ The `rmcp` API changes between versions. Copy from the working code here before 
 
 - A wrong input from Claude is not a Rust error. Answer it as a Tool error with a hint (see `mcp.md`).
 - A failure inside a Tool, for example a missing file or a setting that is not set, is a case of the Capability's `Error` enum (shared `errors.md`). The Tool answers it with `CallToolResult::error`, and the error's `Display` text is the hint for Claude.
+- A Tool whose job is to report a state answers each state as a normal answer, also when another Tool gives that state as an error. Example: `workbench_status` answers "Workbench is not running" with `CallToolResult::success`.
+- A Capability's `mod.rs` brings in `Error` and `Result` with `use error::{Error, Result};`, not `pub use`: ADR 0004 lets a Capability make only its `tools()` function public. This rule wins over "Its parent re-exports both" in the shared `errors.md`.
 - Use `#[expect]` only for code that a macro writes, and say which macro in the reason.
 
 ## Async

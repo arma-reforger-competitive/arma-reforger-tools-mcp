@@ -7,8 +7,10 @@ mod answer_size;
 mod api_docs;
 #[path = "game-files/mod.rs"]
 mod game_files;
+mod host_path;
 mod server;
 mod wiki;
+mod workbench;
 
 #[cfg(test)]
 mod test_support;

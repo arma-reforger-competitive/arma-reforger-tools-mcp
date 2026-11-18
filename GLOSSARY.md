@@ -153,7 +153,11 @@ A script that runs inside Workbench and does a job there when the MCP server ask
 _Avoid_: Plugin (alone)
 
 **Workbench bridge**:
-The connection through which Tools control a running Workbench.
+The connection through which Tools call the Handler script in a Workbench that already runs, over the Workbench NET API. It copies the Handler script and reloads the scripts when needed. It never starts Workbench.
+
+**Handler script**:
+The Workbench plugin of this project: one Enforce Script file that the Workbench bridge copies into the open mod. It answers the calls of the Workbench bridge.
+_Avoid_: Handler (alone), bridge script
 
 **Port**:
 Moving one Capability from the old enfusion-mcp project into this repo by translating its TypeScript into Rust.

@@ -12,7 +12,7 @@ use rmcp::{
     transport::stdio,
 };
 
-use crate::{answer_size, api_docs, game_files, wiki};
+use crate::{answer_size, api_docs, game_files, wiki, workbench};
 
 /// The Server guide: Claude Code reads it once when a session starts. It names every Tool in
 /// backticks, and a test in `tests/server.rs` checks that each name is a served Tool.
@@ -27,6 +27,9 @@ engine pages.
 - `game_find`: the scripts, Prefabs, and configs of the game and of the Workshop mods that \
 Workbench downloaded. They are inside .pak archives, so grep, find, and file search cannot see \
 them, and they are not in the project folder.
+- `workbench_status`: the live state of the user's running Workbench: whether it runs, whether \
+the Handler script of this plugin is loaded, and which mod is open. For how to do something in \
+Workbench, use the wiki Tools.
 
 A class name, a method signature, or a game file path from memory is often wrong. These Tools \
 give the real one.";
@@ -77,7 +80,8 @@ impl ServerHandler for Server {
 
 /// Serves the Tools of every Capability over stdio until Claude Code closes the connection.
 pub async fn run() -> Result<(), Box<dyn std::error::Error>> {
-    let server = Server::new(wiki::tools()? + api_docs::tools()? + game_files::tools());
+    let server =
+        Server::new(wiki::tools()? + api_docs::tools()? + game_files::tools() + workbench::tools());
     server.serve(stdio()).await?.waiting().await?;
     Ok(())
 }

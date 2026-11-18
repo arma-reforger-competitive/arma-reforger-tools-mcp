@@ -17,7 +17,7 @@ Finds Game files: the scripts, prefabs, configs, and other files inside the .pak
 Set them in the `env` of Claude Code's `settings.json`. A path works in Windows form (`D:\Games\...`) and in WSL form (`/mnt/d/Games/...`). Restart Claude Code after a change.
 
 - `REFORGER_GAME_PATH`: the game folder, the folder that holds `ArmaReforger.exe` and `addons`. Without it, or when it has no `addons` folder with .pak files, `game_find` gives an error that names the setting.
-- `REFORGER_WORKBENCH_PROFILE_PATH`: the Workbench profile folder, for example `C:\Users\<you>\Documents\My Games\ArmaReforgerWorkbench`. Without it, `game_find` searches the game only and says so.
+- `REFORGER_WORKBENCH_PROFILE_PATH`: the Workbench profile folder, for example `C:\Users\<you>\Documents\My Games\ArmaReforgerWorkbench`. Without it, `game_find` searches the game only and says so. This is not `REFORGER_WORKBENCH_DOCUMENTS_PATH` of `workbench`: this setting names the folder that holds `addons`, the mods that Workbench downloaded, and a user can move it out of Documents.
 
 ## Data
 

@@ -6,8 +6,9 @@ use std::path::{Path, PathBuf};
 use tokio_util::sync::CancellationToken;
 
 use super::pak::list_files;
-use super::settings::{PROFILE_SETTING, Settings, host_path};
+use super::settings::{PROFILE_SETTING, Settings};
 use super::{Error, Result};
+use crate::host_path::host_path;
 
 /// The name of the first source: the game itself.
 const GAME: &str = "game";
