@@ -198,6 +198,26 @@ async fn describes_every_tool_and_every_tool_input() {
 }
 
 #[tokio::test]
+async fn gives_every_tool_an_input_schema_of_type_object() {
+    // -- Setup & Fixtures
+    let client = start().await;
+
+    // -- Exec & Check
+    // The MCP specification says that the input schema of a Tool has "type": "object", also when
+    // the Tool has no inputs. MCP Inspector does not list a Tool whose schema is `{}`.
+    for tool in client.list_all_tools().await.unwrap() {
+        assert_eq!(
+            tool.input_schema.get("type"),
+            Some(&json!("object")),
+            "{}: the input schema needs \"type\": \"object\", or a client leaves the Tool out",
+            tool.name
+        );
+    }
+
+    client.cancel().await.unwrap();
+}
+
+#[tokio::test]
 async fn writes_logs_to_stderr_and_only_mcp_messages_to_stdout() {
     // -- Setup & Fixtures
     let mut server = Command::new(env!("CARGO_BIN_EXE_reforger"))
