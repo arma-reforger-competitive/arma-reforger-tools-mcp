@@ -6,7 +6,7 @@ yanked = "deny"
 ignore = [
     # chrono is unmaintained, with no known security hole. rmcp always needs it, through its
     # own dependency and the schemars feature "chrono04", so no feature setting removes it.
-    { id = "RUSTSEC-2026-0543", reason = "rmcp always needs chrono" },
+    { id = "RUSTSEC-2026-0543", reason = "Transitive dependency via rmcp/schemars. Advisory is for unmaintained status, not a security vulnerability. Revisit after rmcp updates." },
 ]
 
 [licenses]
