@@ -16,6 +16,10 @@ The `rmcp` API changes between versions. Copy from the working code here before 
 - A test that starts the real program over stdio: `tests/server.rs`.
 - An in-memory server and client for the tests of every Capability: `src/test_support.rs`.
 
+## Public items
+
+- A function for a later ticket becomes `pub` in the PR that adds its first caller. This crate is a program with no library part, so `cargo clippy` fails on a `pub` function that nothing calls (`dead_code`).
+
 ## Errors
 
 - A wrong input from Claude is not a Rust error. Answer it as a Tool error with a hint (see `mcp.md`).
