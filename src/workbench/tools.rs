@@ -14,6 +14,7 @@ use super::Error;
 use super::bridge::{Bridge, Setup};
 use super::install::HANDLER_FOLDER;
 use super::launch::{Launched, launch};
+#[cfg(test)]
 use super::settings::Settings;
 
 /// The input of `workbench_launch`.
@@ -29,12 +30,18 @@ pub(super) struct LaunchInput {
 
 /// Gives the Workbench Tools to the server, with the settings from the environment.
 pub fn tools<S: Send + Sync + 'static>() -> ToolRouter<S> {
-    router(Settings::from_env())
+    router_with(Bridge::from_env())
 }
 
 /// Gives the Workbench Tools with `settings`.
+#[cfg(test)]
 pub(super) fn router<S: Send + Sync + 'static>(settings: Settings) -> ToolRouter<S> {
-    let bridge = Arc::new(Bridge::new(settings));
+    router_with(Bridge::new(settings))
+}
+
+/// Gives the Workbench Tools that call Workbench through `bridge`.
+fn router_with<S: Send + Sync + 'static>(bridge: Bridge) -> ToolRouter<S> {
+    let bridge = Arc::new(bridge);
     let workbench_status = Tool::new(
         "workbench_status",
         "Check the connection to Arma Reforger Workbench, the editor for mods, and get it ready \

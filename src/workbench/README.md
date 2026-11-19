@@ -50,6 +50,10 @@ Set them in the `env` of Claude Code's `settings.json`. A path works in Windows 
 
 `Bridge::call(action, params)` in `bridge.rs` is the one function that a Workbench Tool uses. It sends an action to the Handler script and returns its JSON answer and what it did to the Handler script first. When the Handler script is missing or old, it copies and reloads it, then calls again. A failure is an `Error` with the same text as in `workbench_status`.
 
+`Bridge::from_env()` makes a bridge from the settings in the environment. A Tool of another Capability that calls Workbench makes its bridge there, so the bridge stays the only way to call Workbench. The tests of such a Tool start the fake Workbench in `src/test_support/fake_workbench.rs`.
+
+The Workbench folder in Documents comes from `src/workbench_documents.rs`, so every Capability finds the same folder from `REFORGER_WORKBENCH_DOCUMENTS_PATH`.
+
 ## Keep the handler out of your mod
 
 The Handler script goes into your mod when Workbench packs or publishes it: a pack of the test mod `BridgeTest` had `Scripts/WorkbenchGame/ReforgerBridge/ReforgerBridge.c` in its `data.pak`. Workbench has no setting to leave a folder out of a pack.

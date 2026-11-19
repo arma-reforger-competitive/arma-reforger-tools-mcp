@@ -11,6 +11,7 @@ mod host_path;
 mod server;
 mod wiki;
 mod workbench;
+mod workbench_documents;
 
 #[cfg(test)]
 mod test_support;

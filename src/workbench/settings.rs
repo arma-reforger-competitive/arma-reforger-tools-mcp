@@ -7,7 +7,8 @@ use std::path::PathBuf;
 use std::time::Duration;
 
 use super::{Error, Result};
-use crate::host_path::host_path;
+use crate::host_path::is_wsl;
+use crate::workbench_documents::{DOCUMENTS_SETTING, workbench_documents};
 
 /// The computer that runs Workbench.
 pub(super) const HOST_SETTING: &str = "REFORGER_WORKBENCH_HOST";
@@ -15,20 +16,12 @@ pub(super) const HOST_SETTING: &str = "REFORGER_WORKBENCH_HOST";
 /// The NET API port of Workbench.
 pub(super) const PORT_SETTING: &str = "REFORGER_WORKBENCH_PORT";
 
-/// The Workbench folder in Documents, the folder that holds `profile` and `logs`. It is not
-/// `DOWNLOADS_SETTING`: that setting names the folder of the downloaded mods, which the user can
-/// move out of Documents.
-pub(super) const DOCUMENTS_SETTING: &str = "REFORGER_WORKBENCH_DOCUMENTS_PATH";
-
 /// The folder whose `addons` folder holds the Workshop mods that Workbench downloaded. game-files
 /// reads the same setting.
 pub(super) const DOWNLOADS_SETTING: &str = "REFORGER_WORKBENCH_PROFILE_PATH";
 
 /// The NET API port that Workbench uses when its options do not change it.
 const DEFAULT_PORT: u16 = 5775;
-
-/// The Workbench folder in Documents, under the user's folder on Windows.
-const DOCUMENTS_IN_USER: &str = "Documents/My Games/ArmaReforgerWorkbench";
 
 /// The settings and the time limits. An empty value counts as not set.
 pub(super) struct Settings {
@@ -135,27 +128,10 @@ impl Settings {
         Ok(Address { host, port })
     }
 
-    /// The Workbench folder in Documents. Without the setting, it is the standard folder of the
-    /// Windows user. Under WSL, that is the one folder in `/mnt/c/Users` that has it.
+    /// The Workbench folder in Documents, found the same way as in every Capability (see
+    /// `crate::workbench_documents`).
     pub(super) fn documents(&self) -> Result<PathBuf> {
-        if let Some(raw) = self.documents.as_deref() {
-            return Ok(host_path(raw));
-        }
-        if cfg!(windows) {
-            let user = std::env::var_os("USERPROFILE").ok_or(Error::DocumentsNotFound)?;
-            return Ok(PathBuf::from(user).join(DOCUMENTS_IN_USER));
-        }
-        if !is_wsl() {
-            return Err(Error::DocumentsNotFound);
-        }
-        let mut found = std::fs::read_dir("/mnt/c/Users")
-            .map_err(|_| Error::DocumentsNotFound)?
-            .filter_map(|user| Some(user.ok()?.path().join(DOCUMENTS_IN_USER)))
-            .filter(|folder| folder.join("profile").is_dir());
-        match (found.next(), found.next()) {
-            (Some(folder), None) => Ok(folder),
-            _ => Err(Error::DocumentsNotFound),
-        }
+        workbench_documents(self.documents.as_deref()).ok_or(Error::DocumentsNotFound)
     }
 }
 
@@ -179,13 +155,6 @@ impl fmt::Display for Address {
 }
 
 // region:    --- Support
-
-/// True when the server runs in WSL.
-fn is_wsl() -> bool {
-    cfg!(target_os = "linux")
-        && std::fs::read_to_string("/proc/version")
-            .is_ok_and(|version| version.to_ascii_lowercase().contains("microsoft"))
-}
 
 /// The address of the Windows host as WSL sees it: the gateway of the default route.
 fn windows_host() -> Result<Ipv4Addr> {

@@ -47,6 +47,12 @@ pub enum Setup {
 }
 
 impl Bridge {
+    /// The bridge with the settings from the environment of the server. Every Capability that
+    /// calls Workbench makes its bridge here.
+    pub fn from_env() -> Self {
+        Self::new(Settings::from_env())
+    }
+
     pub(super) fn new(settings: Settings) -> Self {
         Self { settings }
     }
