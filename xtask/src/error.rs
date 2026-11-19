@@ -55,6 +55,10 @@ pub enum Error {
     },
     /// A thread that ran Claude Code stopped with a panic.
     ClaudeRunStopped,
+    /// No Tool-choice test accepts the Tool of `--tool`.
+    NoToolChoiceCase {
+        tool: String,
+    },
     /// Too few Tool-choice tests passed.
     ToolChoiceBelowFloor {
         passed: usize,
@@ -138,6 +142,11 @@ impl fmt::Display for Error {
                 "Cannot start `claude`: {source}. Install Claude Code and log in."
             ),
             Self::ClaudeRunStopped => write!(f, "A Claude Code run stopped with a panic."),
+            Self::NoToolChoiceCase { tool } => write!(
+                f,
+                "No test in tests/tool-choice/cases.jsonl accepts the Tool {tool}. Check the Tool \
+                 name, or add at least 2 tests for it (docs/agents/mcp.md)."
+            ),
             Self::ToolChoiceBelowFloor { passed, total } => write!(
                 f,
                 "Only {passed} of {total} Tool-choice tests passed; at least 90 % must pass. Read \
@@ -176,6 +185,7 @@ impl std::error::Error for Error {
             | Self::BadSelector(_)
             | Self::CiStepFailed { .. }
             | Self::ClaudeRunStopped
+            | Self::NoToolChoiceCase { .. }
             | Self::ToolChoiceBelowFloor { .. } => None,
         }
     }
