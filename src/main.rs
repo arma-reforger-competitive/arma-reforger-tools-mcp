@@ -8,6 +8,8 @@ mod api_docs;
 #[path = "game-files/mod.rs"]
 mod game_files;
 mod host_path;
+#[path = "reference-mods/mod.rs"]
+mod reference_mods;
 mod server;
 mod wiki;
 mod workbench;

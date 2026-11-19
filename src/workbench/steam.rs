@@ -31,7 +31,7 @@ const WORKBENCH_EXE: &str = r"Workbench\ArmaReforgerWorkbenchSteamDiag.exe";
 
 /// A Steam app that Workbench needs.
 #[derive(Clone, Copy, Debug)]
-pub(super) enum App {
+pub(crate) enum App {
     /// Arma Reforger Tools: Workbench.
     Tools,
 

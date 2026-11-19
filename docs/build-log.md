@@ -68,3 +68,10 @@
 - Fixed: a compressed file is unpacked with zlib, not raw deflate (the old "invalid block type"), and the full size is checked against a 64 MB limit before memory is reserved. A real test opens every 20th script of the game.
 - Changed: capital letters in the path do not matter, and a wrong path gives the 5 closest real paths. In the old project, 27 of 42 reads failed on guessed paths. A binary file is found by a zero byte, not by a list of extensions. `source` picks the game or a mod when both have the path.
 - Not ported: the read of loose files outside the .pak files. The installed game has only .pak files.
+
+## reference_sync without Workbench (#74)
+
+- New Capability `reference-mods` with the Tool `reference_sync`. It is not a Port. It reads `reference-mods.jsonl` in each folder of `REFORGER_MODS_PATH` and keeps its own record in `<Workbench Documents folder>/addons/.reference-mods.jsonl`.
+- It deletes only a mod that is in the record and on no list. Projects, links, `saves`, and mods downloaded by hand stay. A bad setting or a bad list line stops the call before any delete.
+- A pure function makes the plan (delete, download, present). In this ticket a missing mod is a failed line with the message of the Workbench bridge: the download comes in a later ticket.
+- The `workbench` Capability now gives `Bridge` to other Capabilities, so the bridge stays the only way to call Workbench.

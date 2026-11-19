@@ -12,7 +12,7 @@ use rmcp::{
     transport::stdio,
 };
 
-use crate::{answer_size, api_docs, game_files, wiki, workbench};
+use crate::{answer_size, api_docs, game_files, reference_mods, wiki, workbench};
 
 /// The Server guide: Claude Code reads it once when a session starts. It names every Tool in
 /// backticks, and a test in `tests/server.rs` checks that each name is a served Tool.
@@ -35,6 +35,8 @@ the Handler script of this plugin is loaded, and which mod is open. For how to d
 Workbench, use the wiki Tools.
 - `workbench_launch`: start Workbench with the user's mod named in `mod`, and wait until it is \
 ready. When Workbench runs already, it starts nothing and names the open mod.
+- `reference_sync`: make the Workbench addons folder match the Reference mods listed in \
+reference-mods.jsonl in the mod repos: download the missing ones, delete the dropped ones.
 
 A class name, a method signature, or a game file path from memory is often wrong. These Tools \
 give the real one.";
@@ -85,8 +87,13 @@ impl ServerHandler for Server {
 
 /// Serves the Tools of every Capability over stdio until Claude Code closes the connection.
 pub async fn run() -> Result<(), Box<dyn std::error::Error>> {
-    let server =
-        Server::new(wiki::tools()? + api_docs::tools()? + game_files::tools() + workbench::tools());
+    let server = Server::new(
+        wiki::tools()?
+            + api_docs::tools()?
+            + game_files::tools()
+            + workbench::tools()
+            + reference_mods::tools(),
+    );
     server.serve(stdio()).await?.waiting().await?;
     Ok(())
 }

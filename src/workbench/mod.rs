@@ -13,6 +13,7 @@ mod steam;
 mod tools;
 mod wire;
 
+pub use bridge::Bridge;
 use error::{Error, Result};
 pub use tools::tools;
 

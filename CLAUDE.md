@@ -5,7 +5,7 @@ A Claude Code plugin for Arma Reforger modding: an MCP server for Capabilities, 
 ## Where things are
 
 - `src/`: the MCP server. `server.rs` lists the Tools of every Capability. `answer_size.rs` cuts long answers. `host_path.rs` turns a path setting into the form of the computer the server runs on, Windows or WSL, for every Capability (ADR 0006). `workbench_documents.rs` finds the Workbench folder in Documents for every Capability. `test_support/` holds the in-memory server and the fake Workbench for the tests of every Capability. Read `server.rs` before you add a Capability.
-- `src/<capability>/` (`wiki/`, `api-docs/`, `game-files/`, `workbench/`): one Capability each: its Tools, logic, tests, and a `README.md`. Read the folder's `README.md` before you change a Tool (ADR-0004).
+- `src/<capability>/` (`wiki/`, `api-docs/`, `game-files/`, `workbench/`, `reference-mods/`): one Capability each: its Tools, logic, tests, and a `README.md`. Read the folder's `README.md` before you change a Tool (ADR-0004).
 - `src/wiki/pages/` and `src/api-docs/classes.jsonl`: the Knowledge base. `cargo xtask import` writes them from the Workbench docs and `src/wiki/source/export.xml`, which the owner saves from the wiki (ADR-0005). To change them, run the import.
 - `tests/`: tests that start the real program (`server.rs`) or check the Knowledge base files (`knowledge_base.rs`). `tests/tool-choice/cases.jsonl`: the Tool-choice tests.
 - `xtask/`: developer commands: `cargo xtask ci` runs every check, `cargo xtask import` rebuilds the Knowledge base, `cargo xtask tool-choice` runs the Tool-choice tests. Read it before you change a check or the import.

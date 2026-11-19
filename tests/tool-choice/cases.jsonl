@@ -13,3 +13,5 @@
 {"question":"Which mod do I have open in the Reforger editor at the moment?","tools":["workbench_status"]}
 {"question":"Open Workbench with my mod BridgeTest so I can work on it.","tools":["workbench_launch","workbench_status"]}
 {"question":"Can you fire up the Reforger modding editor for me?","tools":["workbench_launch","workbench_status"]}
+{"question":"I removed a mod from my reference list. Clean up the downloaded reference mods so they match my lists again.","tools":["reference_sync"]}
+{"question":"Get the Workshop mods that my mod repos say I should study onto this computer.","tools":["reference_sync"]}

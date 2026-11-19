@@ -84,7 +84,7 @@ pub(super) enum Port {
 
 /// Where the NET API of Workbench listens.
 #[derive(Debug)]
-pub(super) struct Address {
+pub(crate) struct Address {
     pub(super) host: String,
     pub(super) port: u16,
 }
