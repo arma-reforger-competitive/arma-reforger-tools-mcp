@@ -13,11 +13,12 @@ use std::time::Duration;
 use serde_json::{Map, Value};
 use tokio::time::Instant;
 
-use super::error::{BadLine, Error, Result};
+use super::error::BadLine;
 use super::plan::{
     Line, Listed, ModId, Planned, Progress, Recorded, State, answer, folder_of, parse_line,
     parse_progress, parse_record, plan, record_text, recorded_name, unknown_license,
 };
+use super::{Error, Result};
 use crate::host_path::host_path;
 use crate::workbench::Bridge;
 use crate::workbench_documents::workbench_documents;
