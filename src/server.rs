@@ -35,8 +35,10 @@ the Handler script of this plugin is loaded, and which mod is open. For how to d
 Workbench, use the wiki Tools.
 - `workbench_launch`: start Workbench with the user's mod named in `mod`, and wait until it is \
 ready. When Workbench runs already, it starts nothing and names the open mod.
-- `reference_sync`: make the Workbench addons folder match the Reference mods listed in \
-reference-mods.jsonl in the mod repos: download the missing ones, delete the dropped ones.
+- `reference_sync`: get, update, or clean up the Reference mods: the Workshop mods that the \
+user's mod repos list for study. It downloads the missing ones and deletes the dropped ones. It \
+finds and reads the lists itself, and they are not in the project folder, so call it directly, \
+with no input, and do not look for the lists first.
 
 A class name, a method signature, or a game file path from memory is often wrong. These Tools \
 give the real one.";
