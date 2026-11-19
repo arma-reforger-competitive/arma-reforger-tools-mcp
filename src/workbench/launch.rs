@@ -3,8 +3,7 @@
 //!
 //! It finds Workbench through Steam, copies the Handler script into the mod before the start, so
 //! the first compile loads it, and starts the program with `-gproj` and the game folder as the
-//! work folder. Translated from `launchWorkbench` in `src/workbench/client.ts` of enfusion-mcp,
-//! with the program found through Steam, and with `-addonsDir` in place of the dependency links.
+//! work folder.
 //!
 //! A start with `-gproj` looks for dependencies only in the `addons` folders of the game and of
 //! the Workbench folder in Documents. It does not get the launch options of Steam, so when the

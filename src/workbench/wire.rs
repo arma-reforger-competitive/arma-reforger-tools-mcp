@@ -3,8 +3,7 @@
 //! A request is the protocol version (a 4-byte little-endian integer), then three Pascal strings:
 //! the client ID, the content type `JsonRPC`, and the JSON payload. An answer is two Pascal
 //! strings: the status (`Ok` or an error text) and the JSON payload. A Pascal string is a 4-byte
-//! little-endian length and then that many UTF-8 bytes. Translated from
-//! `src/workbench/protocol.ts` of enfusion-mcp.
+//! little-endian length and then that many UTF-8 bytes.
 
 use super::error::Garbled;
 

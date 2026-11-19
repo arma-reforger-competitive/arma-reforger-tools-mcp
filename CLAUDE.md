@@ -18,7 +18,7 @@ A Claude Code plugin for Arma Reforger modding: an MCP server for Capabilities, 
 
 This repo is built by porting Capabilities from the old enfusion-mcp project (ADR-0001). The old project is at `/home/yevhenii/www/arma-enfusion-mcp` (GitHub: `lanka-community/arma-enfusion-mcp`). Treat it as read-only reference.
 
-Before you port a Capability, read its old TypeScript code there. Write the same logic in Rust (ADR-0008), fix what is not sound, and keep the old expected answers as tests. Bring over only what the ticket needs. Translated code keeps the MIT notice from ADR-0001.
+Before you port a Capability, read its old TypeScript code there. Write the same logic in Rust (ADR-0008), fix what is not sound, and keep the old expected answers as tests. Bring over only what the ticket needs. The MIT notice from ADR-0001 is in `LICENSE`. Code comments say what the code does now. The build log says what came from which old file.
 
 A Port is done when all five checks pass:
 

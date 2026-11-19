@@ -1,6 +1,4 @@
 //! The `game_find` Tool: finds Game files by a part of their name or path, or by a class name.
-//!
-//! The ranking is translated from `src/tools/asset-search.ts` of enfusion-mcp.
 
 use std::fmt::Write as _;
 
