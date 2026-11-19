@@ -75,3 +75,9 @@
 - It deletes only a mod that is in the record and on no list. Projects, links, `saves`, and mods downloaded by hand stay. A bad setting or a bad list line stops the call before any delete.
 - A pure function makes the plan (delete, download, present). In this ticket a missing mod is a failed line with the message of the Workbench bridge: the download comes in a later ticket.
 - The `workbench` Capability now gives `Bridge` to other Capabilities, so the bridge stays the only way to call Workbench.
+
+## reference_sync downloads (#77)
+
+- The Handler script got the actions `reference_download` and `reference_progress`, with the steps that #19 proved: `RequestPage` with `"search": "<ID>"`, keep the item with that exact ID, `AskDetail`, then `Download` of `GetLatestRevision()`. The license name comes from `License()`.
+- The state of each download stays in Workbench memory between calls. A second start of the same ID starts nothing, unless its last try failed. One search runs at a time, because the Workshop keeps only the items of the last page.
+- The Handler version and the version in `Cargo.toml` went up to 0.2.0. A test checks that the script has both actions and every field that `reference_sync` reads. The compile and the real download need the real Workbench.

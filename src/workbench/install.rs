@@ -59,6 +59,36 @@ mod tests {
             "set VERSION in ReforgerBridge.c to the version in Cargo.toml: {line}"
         );
     }
+
+    #[test]
+    fn handler_script_knows_the_actions_and_fields_of_reference_sync() {
+        // -- Setup & Fixtures
+        // The actions and the fields that `reference_sync` uses (see src/reference-mods/README.md).
+        let actions = ["\"reference_download\"", "\"reference_progress\""];
+        let fields = [
+            "id",
+            "state",
+            "percent",
+            "name",
+            "mod_version",
+            "license",
+            "reason",
+        ];
+
+        // -- Exec & Check
+        for action in actions {
+            assert!(
+                HANDLER_SCRIPT.contains(&format!("req.action == {action}")),
+                "the Handler script has no branch for the action {action}"
+            );
+        }
+        for field in fields {
+            assert!(
+                HANDLER_SCRIPT.contains(&format!("RegV(\"{field}\");")),
+                "the Handler script does not register the field \"{field}\""
+            );
+        }
+    }
 }
 
 // endregion: --- Tests
