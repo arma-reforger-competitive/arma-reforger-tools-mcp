@@ -4,6 +4,7 @@
 use std::fmt::{self, Write as _};
 
 use serde::{Deserialize, Serialize};
+use serde_json::{Map, Value};
 
 use super::error::BadLine;
 
@@ -91,8 +92,27 @@ pub(super) struct Line {
 /// The state of one mod after the call.
 pub(super) enum State {
     Present,
+    Downloaded,
+    Downloading { percent: u8 },
     Deleted,
     Failed { reason: String },
+}
+
+/// The progress of one download, as the Handler script answers `reference_progress`.
+#[derive(Debug, PartialEq, Eq)]
+pub(super) enum Progress {
+    /// The download runs. The search on the Workshop counts as 0 percent. The percent is a whole
+    /// number from 0 to 100.
+    Running {
+        percent: u8,
+    },
+    Complete {
+        version: String,
+        license: String,
+    },
+    Failed {
+        reason: String,
+    },
 }
 
 /// The fields of a list line, before the check of their values.
@@ -192,6 +212,10 @@ pub(super) fn answer(lines: &[Line]) -> String {
         );
         match &line.state {
             State::Present => text.push_str("present"),
+            State::Downloaded => text.push_str("downloaded"),
+            State::Downloading { percent } => {
+                let _ = write!(text, "downloading {percent}%");
+            }
             State::Deleted => text.push_str("deleted"),
             State::Failed { reason } => {
                 let _ = write!(text, "failed: {reason}");
@@ -199,6 +223,49 @@ pub(super) fn answer(lines: &[Line]) -> String {
         }
     }
     text
+}
+
+/// The progress in the answer of the Handler script to `reference_progress`. The mod version is
+/// in `mod_version`, because the bridge uses `version` for the version of the Handler script.
+pub(super) fn parse_progress(answer: &Map<String, Value>) -> Progress {
+    let text = |field| {
+        answer
+            .get(field)
+            .and_then(Value::as_str)
+            .unwrap_or(UNKNOWN_LICENSE)
+            .to_owned()
+    };
+    match answer.get("state").and_then(Value::as_str) {
+        Some("searching") => Progress::Running { percent: 0 },
+        Some("downloading") => Progress::Running {
+            percent: answer
+                .get("percent")
+                .and_then(Value::as_u64)
+                .map_or(0, |percent| u8::try_from(percent.min(100)).unwrap_or(100)),
+        },
+        Some("complete") => Progress::Complete {
+            version: text("mod_version"),
+            license: text("license"),
+        },
+        Some("failed") => Progress::Failed {
+            reason: answer
+                .get("reason")
+                .and_then(Value::as_str)
+                .unwrap_or("Workbench gave no reason")
+                .to_owned(),
+        },
+        other => Progress::Failed {
+            reason: format!(
+                "the Handler script gave the download state {}, which the Tool does not know",
+                other.map_or_else(|| "none".to_owned(), |state| format!("\"{state}\""))
+            ),
+        },
+    }
+}
+
+/// The folder of the mod `id` in `folders`: the name that ends in `_<ID>`.
+pub(super) fn folder_of<'a>(id: &ModId, folders: &'a [String]) -> Option<&'a String> {
+    folders.iter().find(|folder| id.names(folder))
 }
 
 /// The name of a recorded mod: its folder name without `_<ID>`.

@@ -1,12 +1,14 @@
 use std::fs;
 use std::path::{Path, PathBuf};
+use std::sync::Arc;
+use std::time::Duration;
 
 use serde_json::json;
 use tempfile::TempDir;
 
 use super::*;
 use crate::server::Server;
-use crate::test_support::fake_workbench::free_port;
+use crate::test_support::fake_workbench::{Reload, Reply, Workshop, fake_workbench, free_port};
 use crate::test_support::{self, Answer};
 use crate::workbench::Bridge;
 
@@ -225,6 +227,81 @@ async fn stops_before_any_delete_when_the_mods_path_is_not_set_or_not_a_folder()
     }
 }
 
+#[tokio::test]
+async fn reports_a_running_download_then_records_it_on_the_next_call_without_a_second_start() {
+    // -- Setup & Fixtures
+    let setup = Setup::new();
+    setup.list(
+        "TvtMission",
+        &format!(r#"{{"id":"{MISSING}","name":"S3C_CameraFix"}}"#),
+    );
+    let workshop = Workshop::new(setup.addons());
+    workshop.add(MISSING, "S3C_CameraFix", "1.0.2", "APL-SA", 40);
+    let port = fake_workbench(
+        Reply::workbench(Some(env!("CARGO_PKG_VERSION")), Reload::Loads)
+            .with_workshop(Arc::clone(&workshop)),
+    )
+    .await;
+    let client = setup.client(port).await;
+
+    // -- Exec
+    let first = test_support::call(&client, "reference_sync", json!({})).await;
+    workshop.finish(MISSING);
+    let second = test_support::call(&client, "reference_sync", json!({})).await;
+
+    // -- Check
+    assert!(!first.is_error, "{}", first.text);
+    assert_eq!(
+        first.text,
+        format!("S3C_CameraFix ({MISSING}), license unknown: downloading 40%")
+    );
+    assert!(!second.is_error, "{}", second.text);
+    assert_eq!(
+        second.text,
+        format!("S3C_CameraFix ({MISSING}), license APL-SA: downloaded")
+    );
+    assert_eq!(workshop.starts(MISSING), 1);
+    assert_eq!(
+        setup.record_text(),
+        format!(
+            "{{\"id\":\"{MISSING}\",\"folder\":\"S3C_CameraFix_{MISSING}\",\"version\":\"1.0.2\",\"license\":\"APL-SA\"}}\n"
+        )
+    );
+}
+
+#[tokio::test]
+async fn gives_an_id_that_the_workshop_does_not_know_a_failed_line_and_downloads_the_others() {
+    // -- Setup & Fixtures
+    let setup = Setup::new();
+    setup.list(
+        "TvtMission",
+        &format!(
+            "{{\"id\":\"{DROPPED}\",\"name\":\"NoSuchMod\"}}\n{{\"id\":\"{MISSING}\",\"name\":\"S3C_CameraFix\"}}\n"
+        ),
+    );
+    let workshop = Workshop::new(setup.addons());
+    workshop.add(MISSING, "S3C_CameraFix", "1.0.2", "APL-SA", 100);
+    let port = fake_workbench(
+        Reply::workbench(Some(env!("CARGO_PKG_VERSION")), Reload::Loads)
+            .with_workshop(Arc::clone(&workshop)),
+    )
+    .await;
+    let client = setup.client(port).await;
+
+    // -- Exec
+    let answer = test_support::call(&client, "reference_sync", json!({})).await;
+
+    // -- Check
+    assert!(!answer.is_error, "{}", answer.text);
+    assert_eq!(
+        answer.text,
+        format!(
+            "NoSuchMod ({DROPPED}), license unknown: failed: the Workshop has no mod with this \
+             ID\nS3C_CameraFix ({MISSING}), license APL-SA: downloaded"
+        )
+    );
+}
+
 // -- Test Support
 
 /// A temp folder of mod repos and a temp Workbench folder in Documents.
@@ -290,8 +367,27 @@ impl Setup {
 
     async fn sync_with(&self, settings: Settings) -> Answer {
         let bridge = Bridge::for_test(free_port().await, self.documents.path());
-        let client = test_support::connect(router_with::<Server>(settings, bridge)).await;
+        let client =
+            test_support::connect(router_with::<Server>(settings, bridge, short_wait())).await;
         test_support::call(&client, "reference_sync", json!({})).await
+    }
+
+    /// A client of one server, which calls the fake Workbench on `port`.
+    async fn client(&self, port: u16) -> test_support::TestClient {
+        let settings = Settings {
+            mods: Some(self.mods.path().to_string_lossy().into_owned()),
+            documents: Some(self.documents.path().to_string_lossy().into_owned()),
+        };
+        let bridge = Bridge::for_test(port, self.documents.path());
+        test_support::connect(router_with::<Server>(settings, bridge, short_wait())).await
+    }
+}
+
+/// The wait for the downloads, short for the tests.
+fn short_wait() -> Wait {
+    Wait {
+        poll: Duration::from_millis(10),
+        total: Duration::from_millis(100),
     }
 }
 

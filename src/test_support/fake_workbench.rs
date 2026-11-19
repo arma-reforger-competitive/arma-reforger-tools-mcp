@@ -1,6 +1,9 @@
 //! A fake Workbench NET API on 127.0.0.1, for the tests of every Capability that calls Workbench
 //! through the bridge.
 
+use std::collections::BTreeMap;
+use std::fs;
+use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
@@ -12,11 +15,13 @@ use tokio::net::TcpListener;
 pub enum Reply {
     /// It answers like Workbench 1.6: `GetLoadedProjects` gives `loaded`, the Handler script
     /// answers with the version in `handler` or is not loaded, and `ReloadScripts` does what
-    /// `reload` says.
+    /// `reload` says. The Handler actions `reference_download` and `reference_progress` use
+    /// `workshop`.
     Workbench {
         loaded: Vec<String>,
         handler: Mutex<Option<String>>,
         reload: Reload,
+        workshop: Option<Arc<Workshop>>,
     },
 
     /// It takes the connection and never answers.
@@ -50,6 +55,25 @@ impl Reply {
             loaded: vec!["ArmaReforger".to_owned(), "BridgeTest".to_owned()],
             handler: Mutex::new(handler.map(str::to_owned)),
             reload,
+            workshop: None,
+        }
+    }
+
+    /// The same Workbench, which downloads the mods of `workshop`.
+    pub fn with_workshop(self, workshop: Arc<Workshop>) -> Self {
+        match self {
+            Self::Workbench {
+                loaded,
+                handler,
+                reload,
+                ..
+            } => Self::Workbench {
+                loaded,
+                handler,
+                reload,
+                workshop: Some(workshop),
+            },
+            other => other,
         }
     }
 
@@ -57,14 +81,110 @@ impl Reply {
     pub fn loading(self, ids: &[&str]) -> Self {
         match self {
             Self::Workbench {
-                handler, reload, ..
+                handler,
+                reload,
+                workshop,
+                ..
             } => Self::Workbench {
                 loaded: ids.iter().map(|id| (*id).to_owned()).collect(),
                 handler,
                 reload,
+                workshop,
             },
             other => other,
         }
+    }
+}
+
+/// The fake Workshop: the mods that the fake Workbench can download into `addons`. A download
+/// stays at its percent until the test calls `finish`. A download at 100 percent ends when it
+/// starts.
+pub struct Workshop {
+    addons: PathBuf,
+    mods: Mutex<BTreeMap<String, WorkshopMod>>,
+}
+
+struct WorkshopMod {
+    name: String,
+    version: String,
+    license: String,
+    percent: u8,
+    starts: usize,
+    complete: bool,
+}
+
+impl Workshop {
+    /// A Workshop with no mods, which downloads into `addons`.
+    pub fn new(addons: PathBuf) -> Arc<Self> {
+        Arc::new(Self {
+            addons,
+            mods: Mutex::new(BTreeMap::new()),
+        })
+    }
+
+    /// Adds the mod `id`. Its download stays at `percent` until `finish`, or ends when it starts
+    /// when `percent` is 100.
+    pub fn add(&self, id: &str, name: &str, version: &str, license: &str, percent: u8) {
+        self.mods.lock().unwrap().insert(
+            id.to_owned(),
+            WorkshopMod {
+                name: name.to_owned(),
+                version: version.to_owned(),
+                license: license.to_owned(),
+                percent,
+                starts: 0,
+                complete: false,
+            },
+        );
+    }
+
+    /// Ends the download of `id`: its folder `<Name>_<ID>` comes into `addons`.
+    pub fn finish(&self, id: &str) {
+        let mut mods = self.mods.lock().unwrap();
+        self.complete(id, mods.get_mut(id).unwrap());
+    }
+
+    /// How many times the Handler script was asked to start a download of `id`.
+    pub fn starts(&self, id: &str) -> usize {
+        self.mods.lock().unwrap().get(id).map_or(0, |m| m.starts)
+    }
+
+    /// The answer of the Handler script to `action` with the parameter `id`, as the contract in
+    /// issue #75 gives it.
+    fn answer(&self, action: &str, id: &str) -> Value {
+        let mut mods = self.mods.lock().unwrap();
+        let Some(workshop_mod) = mods.get_mut(id) else {
+            return match action {
+                "reference_download" => json!({}),
+                _ => json!({
+                    "state": "failed",
+                    "reason": "the Workshop has no mod with this ID"
+                }),
+            };
+        };
+        match action {
+            "reference_download" => {
+                workshop_mod.starts += 1;
+                if workshop_mod.starts == 1 && workshop_mod.percent == 100 {
+                    self.complete(id, workshop_mod);
+                }
+                json!({})
+            }
+            _ if workshop_mod.complete => json!({
+                "state": "complete",
+                "name": workshop_mod.name,
+                "mod_version": workshop_mod.version,
+                "license": workshop_mod.license
+            }),
+            _ => json!({ "state": "downloading", "percent": workshop_mod.percent }),
+        }
+    }
+
+    fn complete(&self, id: &str, workshop_mod: &mut WorkshopMod) {
+        workshop_mod.complete = true;
+        let folder = self.addons.join(format!("{}_{id}", workshop_mod.name));
+        fs::create_dir_all(&folder).unwrap();
+        fs::write(folder.join("data.pak"), "pak").unwrap();
     }
 }
 
@@ -107,11 +227,13 @@ pub fn serve(listener: TcpListener, reply: Arc<Reply>) {
                         loaded,
                         handler,
                         reload,
+                        workshop,
                     } => answer_like_workbench(
                         &request,
                         loaded,
                         &mut handler.lock().unwrap(),
                         *reload,
+                        workshop.as_deref(),
                     ),
                 };
                 stream.write_all(&bytes).await.unwrap();
@@ -136,6 +258,7 @@ fn answer_like_workbench(
     loaded: &[String],
     handler: &mut Option<String>,
     reload: Reload,
+    workshop: Option<&Workshop>,
 ) -> Vec<u8> {
     let payload: Value = serde_json::from_slice(last_string(request)).unwrap();
     let (status, body) = match (payload["APIFunc"].as_str().unwrap(), handler.as_deref()) {
@@ -155,10 +278,19 @@ fn answer_like_workbench(
             Reload::CompilationFailed => ("Compilation failed", json!({})),
             Reload::KeepsOld => ("Ok", json!({})),
         },
-        ("ReforgerBridge", Some(version)) => (
-            "Ok",
-            json!({ "version": version, "action": payload["action"], "error": "" }),
-        ),
+        ("ReforgerBridge", Some(version)) => {
+            let action = payload["action"].as_str().unwrap_or_default();
+            let mut body = match (action, workshop) {
+                ("reference_download" | "reference_progress", Some(workshop)) => {
+                    workshop.answer(action, payload["id"].as_str().unwrap_or_default())
+                }
+                _ => json!({}),
+            };
+            body["version"] = json!(version);
+            body["action"] = json!(action);
+            body["error"] = json!("");
+            ("Ok", body)
+        }
         _ => ("Undefined API func", json!({})),
     };
     let mut bytes = Vec::new();

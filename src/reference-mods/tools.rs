@@ -6,17 +6,22 @@ use rmcp::handler::server::router::tool::ToolRouter;
 use rmcp::model::{CallToolResult, ContentBlock, Tool, ToolAnnotations};
 use serde_json::Map;
 
-use super::sync::{Settings, sync};
+use super::sync::{Settings, Started, Wait, sync};
 use crate::workbench::Bridge;
 
 /// Gives the reference-mods Tool to the server, with the settings from the environment.
 pub fn tools<S: Send + Sync + 'static>() -> ToolRouter<S> {
-    router_with(Settings::from_env(), Bridge::from_env())
+    router_with(Settings::from_env(), Bridge::from_env(), Wait::workshop())
 }
 
-/// Gives the reference-mods Tool with `settings`. It calls Workbench through `bridge`.
-fn router_with<S: Send + Sync + 'static>(settings: Settings, bridge: Bridge) -> ToolRouter<S> {
-    let state = Arc::new((settings, bridge));
+/// Gives the reference-mods Tool with `settings`. It calls Workbench through `bridge` and waits
+/// for the downloads as `wait` says.
+fn router_with<S: Send + Sync + 'static>(
+    settings: Settings,
+    bridge: Bridge,
+    wait: Wait,
+) -> ToolRouter<S> {
+    let state = Arc::new((settings, bridge, wait, Started::default()));
     let reference_sync = Tool::new(
         "reference_sync",
         "Make the Workshop mods in the Workbench addons folder match the Reference mods: the \
@@ -36,8 +41,8 @@ fn router_with<S: Send + Sync + 'static>(settings: Settings, bridge: Bridge) -> 
     ToolRouter::new().with_route((reference_sync, move || {
         let state = Arc::clone(&state);
         async move {
-            let (settings, bridge) = state.as_ref();
-            match sync(settings, bridge).await {
+            let (settings, bridge, wait, started) = state.as_ref();
+            match sync(settings, bridge, wait, started).await {
                 Ok(text) => CallToolResult::success(vec![ContentBlock::text(text)]),
                 Err(error) => CallToolResult::error(vec![ContentBlock::text(error.to_string())]),
             }
