@@ -35,4 +35,8 @@ pub struct ToolChoiceArgs {
     /// How many times to ask each question. Answers differ between runs.
     #[arg(long, default_value_t = 3)]
     pub runs: usize,
+    /// Ask only the tests that accept this Tool, for example `reference_sync`. Use it before the PR
+    /// of a new or changed Tool; run every test before the merge.
+    #[arg(long)]
+    pub tool: Option<String>,
 }

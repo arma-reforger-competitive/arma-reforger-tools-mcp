@@ -23,8 +23,8 @@ Before you port a Capability, read its old TypeScript code there. Write the same
 A Port is done when all five checks pass:
 
 1. An automated test proves the real behaviour.
-2. Each new Tool gives the expected answers in MCP Inspector: `npx -y @modelcontextprotocol/inspector@2.15.0 --cli target/release/reforger --method tools/call --tool-name <tool> --tool-arg <name>=<value>`. Run `cargo build --release` first.
-3. Each new Tool has at least 2 Tool-choice tests in `tests/tool-choice/cases.jsonl`, and `cargo xtask tool-choice` passes.
+2. Each new Tool gives the expected answers through MCP Inspector: `node .claude/skills/workbench-test/tool.ts <tool> <name>=<value>`. It passes your `REFORGER_*` settings and prints only the answer. Run `cargo build --release` first.
+3. Each new Tool has at least 2 Tool-choice tests in `tests/tool-choice/cases.jsonl`. `cargo xtask tool-choice --tool <tool>` passes before the PR, and `cargo xtask tool-choice` passes before the merge.
 4. `docs/build-log.md` has a 3-5 line entry: what was ported, what changed from the old code, and why.
 5. The Port's rows in the Port ledger are marked "ported": `node .claude/skills/port-status/port-status.ts set ported <old feature> --tool <new tool>`. The agent sets this itself, in the Port's PR, when checks 1-4 pass and the ticket has no work left.
 
@@ -36,4 +36,4 @@ Read `docs/agents/rust.md` before you change Rust code, and `docs/agents/mcp.md`
 
 Commit messages follow Conventional Commits with this project's types and scopes. Read `docs/agents/commits.md` before every commit.
 
-The git hooks are in `.githooks/`. After a clone, turn them on: `git config core.hooksPath .githooks`. The pre-commit hook runs `cargo check --workspace` on the staged files, so every commit builds. The commit-msg hook checks the message.
+The git hooks are in `.githooks/`. After a clone, turn them on: `git config core.hooksPath .githooks`. The pre-commit hook runs `cargo fmt --check` and `cargo check --workspace` on the staged files, so every commit is formatted and builds. The commit-msg hook checks the message.

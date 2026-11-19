@@ -12,7 +12,7 @@ Example: `wiki_read` says that it returns the full text of one page, and that an
 
 ## Tool-choice tests
 
-A Tool description, an input description, and the Server guide decide which Tool Claude calls. A change to any of them is a change in behaviour. Run `cargo xtask tool-choice` after the change, and put the pass rate of the last run in the PR.
+A Tool description, an input description, and the Server guide decide which Tool Claude calls. A change to any of them is a change in behaviour. Before you open the PR, run `cargo xtask tool-choice --tool <name>` for each new or changed Tool: it asks only the tests that accept that Tool, so it costs little. Run `cargo xtask tool-choice` with no `--tool` before the merge, because a change in the Server guide can pull Claude away from other Tools. Put the pass rate of the last full run in the PR.
 
 A new Tool gets at least 2 Tool-choice tests in `tests/tool-choice/cases.jsonl`. Write the question as a user asks it, not with words from the description. Accept every Tool that gives a good answer.
 

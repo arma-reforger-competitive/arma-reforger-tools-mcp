@@ -50,7 +50,7 @@ pub fn run(args: &ToolChoiceArgs) -> Result<()> {
             path: PathBuf::from(".."),
             source,
         })?;
-    let cases = load_cases(&root.join(CASES))?;
+    let cases = for_tool(load_cases(&root.join(CASES))?, args.tool.as_deref())?;
     build_server(&root)?;
     let work = prepare_folder(&root)?;
 
@@ -114,6 +114,23 @@ pub fn run(args: &ToolChoiceArgs) -> Result<()> {
 }
 
 // region:    --- Support
+
+/// The tests that accept `tool`, or every test when `tool` is `None`.
+fn for_tool(cases: Vec<Case>, tool: Option<&str>) -> Result<Vec<Case>> {
+    let Some(tool) = tool else {
+        return Ok(cases);
+    };
+    let cases: Vec<Case> = cases
+        .into_iter()
+        .filter(|case| case.tools.iter().any(|name| name == tool))
+        .collect();
+    if cases.is_empty() {
+        return Err(Error::NoToolChoiceCase {
+            tool: tool.to_owned(),
+        });
+    }
+    Ok(cases)
+}
 
 fn load_cases(path: &Path) -> Result<Vec<Case>> {
     let text = fs::read_to_string(path).map_err(|source| Error::Read {
@@ -333,6 +350,35 @@ mod tests {
         ));
         assert!(!matches(&want, Some(&("wiki_read".to_string(), json!({})))));
         assert!(!matches(&want, None));
+    }
+
+    #[test]
+    fn asks_only_the_tests_that_accept_the_tool_of_the_tool_input() {
+        // -- Setup & Fixtures
+        let cases = || {
+            vec![
+                case(r#"{"question":"a","tools":["game_find","game_read"]}"#),
+                case(r#"{"question":"b","tools":["wiki_read"]}"#),
+                case(r#"{"question":"c","tools":["game_read"]}"#),
+            ]
+        };
+        let questions = |cases: Vec<Case>| {
+            cases
+                .into_iter()
+                .map(|case| case.question)
+                .collect::<Vec<_>>()
+        };
+
+        // -- Exec & Check
+        assert_eq!(
+            questions(for_tool(cases(), Some("game_read")).unwrap()),
+            ["a", "c"]
+        );
+        assert_eq!(questions(for_tool(cases(), None).unwrap()), ["a", "b", "c"]);
+        assert!(matches!(
+            for_tool(cases(), Some("game_reed")),
+            Err(Error::NoToolChoiceCase { tool }) if tool == "game_reed"
+        ));
     }
 }
 
