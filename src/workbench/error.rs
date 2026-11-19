@@ -4,8 +4,9 @@
 use std::fmt;
 use std::path::PathBuf;
 
-use super::settings::{Address, DOCUMENTS_SETTING, DOWNLOADS_SETTING, HOST_SETTING, PORT_SETTING};
+use super::settings::{Address, DOWNLOADS_SETTING, HOST_SETTING, PORT_SETTING};
 use super::steam::App;
+use crate::workbench_documents::DOCUMENTS_SETTING;
 
 /// Where users report a bug of the plugin.
 const ISSUES_URL: &str = "https://github.com/lanka-community/arma-reforger-tools-mcp/issues";

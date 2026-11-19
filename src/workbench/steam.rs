@@ -6,7 +6,8 @@
 //! Workbench needs a running Steam with a logged-in user, and it does not start Steam itself. On
 //! Workbench 1.6 without Steam, it logs `SteamAPI_Init failed. Is Steam running?` and closes.
 //! While a user is logged in, Steam writes a value other than 0 to `ActiveUser` in
-//! `HKCU\Software\Valve\Steam\ActiveProcess`, and 0 when Steam is closed.
+//! `HKCU\Software\Valve\Steam\ActiveProcess`. Steam does not always write 0 when it closes, so
+//! the check also needs a running `steam.exe` in `tasklist.exe`.
 
 use std::fs;
 use std::path::PathBuf;
@@ -31,7 +32,7 @@ const WORKBENCH_EXE: &str = r"Workbench\ArmaReforgerWorkbenchSteamDiag.exe";
 
 /// A Steam app that Workbench needs.
 #[derive(Clone, Copy, Debug)]
-pub(super) enum App {
+pub(crate) enum App {
     /// Arma Reforger Tools: Workbench.
     Tools,
 
@@ -89,8 +90,9 @@ pub(super) async fn find_install(steam: Option<&str>) -> Result<Install> {
     })
 }
 
-/// True when a user is logged in to Steam. A missing key or value counts as no user: Steam never
-/// ran.
+/// True when Steam runs and a user is logged in. A missing key or value counts as no user: Steam
+/// never ran. Steam does not always set `ActiveUser` back to 0 when it closes, so the process must
+/// run too.
 pub(super) async fn steam_logged_in() -> bool {
     let Ok(output) = Command::new("reg.exe")
         .args(["query", ACTIVE_PROCESS_KEY, "/v", "ActiveUser"])
@@ -99,7 +101,17 @@ pub(super) async fn steam_logged_in() -> bool {
     else {
         return false;
     };
-    active_user(&String::from_utf8_lossy(&output.stdout))
+    if !active_user(&String::from_utf8_lossy(&output.stdout)) {
+        return false;
+    }
+    let Ok(output) = Command::new("tasklist.exe")
+        .args(["/FI", "IMAGENAME eq steam.exe", "/FO", "CSV", "/NH"])
+        .output()
+        .await
+    else {
+        return false;
+    };
+    steam_process(&String::from_utf8_lossy(&output.stdout))
 }
 
 // region:    --- Support
@@ -158,6 +170,15 @@ fn active_user(output: &str) -> bool {
         .find_map(|line| line.split_once("REG_DWORD")?.1.trim().strip_prefix("0x"))
         .and_then(|hex| u32::from_str_radix(hex, 16).ok())
         .is_some_and(|user| user != 0)
+}
+
+/// True when the CSV output of `tasklist.exe` has a `steam.exe` row. When no process matches,
+/// `tasklist.exe` prints a message in the language of Windows, so only the row counts.
+fn steam_process(output: &str) -> bool {
+    output.lines().any(|line| {
+        line.get(..11)
+            .is_some_and(|start| start.eq_ignore_ascii_case("\"steam.exe\""))
+    })
 }
 
 /// The key and the value of a line `"key"  "value"` in a Steam file. A `\\` in the value is one
@@ -245,6 +266,21 @@ mod tests {
         assert!(!active_user(&answer("0x0")));
         assert!(!active_user(
             "ERROR: The system was unable to find the specified registry key or value.\r\n"
+        ));
+    }
+
+    #[test]
+    fn finds_the_steam_process_in_the_process_list() {
+        // -- Setup & Fixtures
+        // The output of `tasklist.exe /FO CSV /NH` on Windows 11: a running Steam, and no match.
+        let running = "\"steam.exe\",\"12345\",\"Console\",\"1\",\"80 000 K\"\r\n";
+        let none = "INFO: No tasks are running which match the specified criteria.\r\n";
+
+        // -- Exec & Check
+        assert!(steam_process(running));
+        assert!(!steam_process(none));
+        assert!(!steam_process(
+            "\"steamwebhelper.exe\",\"222\",\"Console\",\"1\",\"9 K\"\r\n"
         ));
     }
 }

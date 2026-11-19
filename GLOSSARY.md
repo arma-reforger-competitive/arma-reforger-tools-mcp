@@ -24,6 +24,10 @@ _Avoid_: Level, terrain (terrain is only the ground)
 The unique id of a mod or of one resource in a mod, written as 16 hex characters. A mod's GUID is also its ID on the Workshop.
 _Avoid_: UUID, ID (alone), hash
 
+**Reference mod**:
+A Workshop mod that the agent reads to learn how a feature works. It is listed in a mod repo and is never stored in git.
+_Avoid_: Example mod, dependency
+
 **Scenario Framework**:
 The built-in Reforger system for building missions from areas, layers, slots, and actions with little or no script code.
 

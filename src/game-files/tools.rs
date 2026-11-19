@@ -9,7 +9,7 @@ use rmcp::model::{CallToolResult, ContentBlock, Tool};
 use tokio_util::sync::CancellationToken;
 
 use super::find::{FindInput, find};
-use super::index::{Index, build};
+use super::index::{Index, ModsOnDisk, build};
 use super::read::{ReadInput, read};
 use super::settings::Settings;
 use super::{Error, Result};
@@ -96,15 +96,19 @@ struct Files {
 }
 
 impl Files {
-    /// The index of every Game file. The first call builds it outside the server thread. A
-    /// failed build is not kept, so the next call tries again.
+    /// The index of every Game file. The first call builds it outside the server thread. Each
+    /// later call builds it again when the mod folders or their .pak files on disk are not the
+    /// ones it was built from, so a mod that Workbench downloads shows with no restart. A failed
+    /// build is not kept, so the next call tries again.
     async fn index(&self, cancel: CancellationToken) -> Result<Arc<Index>> {
-        if let Some(index) = self.cached() {
-            return Ok(index);
-        }
         let settings = self.settings.clone();
-        let index = match tokio::task::spawn_blocking(move || build(&settings, &cancel)).await {
-            Ok(index) => Arc::new(index?),
+        let cached = self.cached();
+        let index = tokio::task::spawn_blocking(move || match cached {
+            Some(index) if index.mods == ModsOnDisk::list(&settings) => Ok(index),
+            _ => build(&settings, &cancel).map(Arc::new),
+        });
+        let index = match index.await {
+            Ok(index) => index?,
             Err(join_error) if join_error.is_panic() => return Err(Error::ReaderStopped),
             Err(_) => return Err(Error::Cancelled),
         };

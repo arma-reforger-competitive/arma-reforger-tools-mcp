@@ -47,8 +47,28 @@ pub enum Setup {
 }
 
 impl Bridge {
+    /// The bridge with the settings from the environment of the server. Every Capability that
+    /// calls Workbench makes its bridge here.
+    pub fn from_env() -> Self {
+        Self::new(Settings::from_env())
+    }
+
     pub(super) fn new(settings: Settings) -> Self {
         Self { settings }
+    }
+
+    /// A bridge for the tests of other Capabilities: Workbench on 127.0.0.1 at `port`, the
+    /// Workbench folder in Documents at `documents`, and short time limits.
+    #[cfg(test)]
+    pub fn for_test(port: u16, documents: &std::path::Path) -> Self {
+        let mut settings = Settings::from_env();
+        settings.host = Some("127.0.0.1".to_owned());
+        settings.port = super::settings::Port::Valid(port);
+        settings.documents = Some(documents.to_string_lossy().into_owned());
+        settings.connect_timeout = Duration::from_secs(2);
+        settings.answer_timeout = Duration::from_millis(300);
+        settings.reload_timeout = Duration::from_secs(2);
+        Self::new(settings)
     }
 
     /// Calls `action` on the Handler script with `params`, and returns its answer and what the

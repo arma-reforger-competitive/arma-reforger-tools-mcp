@@ -34,7 +34,9 @@ async fn finds_the_script_of_a_class_by_a_part_of_its_name() {
              - scripts/Game/Character/CharacterCameraHandlerComponent.c (game)\n\
              - scripts/Game/Plugins/Persistence/System/Serializers/Components/Character/\
              SCR_CharacterCameraHandlerComponentSerializer.c (game)\n\n\
-             REFORGER_WORKBENCH_PROFILE_PATH is not set, so the search covered the game only."
+             REFORGER_WORKBENCH_DOCUMENTS_PATH is not set and the Tool found no Workbench \
+             folder in Documents, so the search covered the game only. To also search the \
+             Workshop mods that Workbench downloaded, set REFORGER_WORKBENCH_DOCUMENTS_PATH"
         ),
         "{}",
         answer.text
@@ -88,6 +90,135 @@ async fn names_the_mod_of_a_file_in_a_downloaded_workshop_mod() {
 }
 
 #[tokio::test]
+async fn finds_a_mod_that_workbench_downloaded_to_documents_after_the_first_call() {
+    // -- Setup & Fixtures
+    let test = "finds_a_mod_that_workbench_downloaded_to_documents_after_the_first_call";
+    let game = game_folder(test, CAMERA_FILES);
+    let documents = game.with_file_name("documents");
+    fs::create_dir_all(documents.join("addons")).unwrap();
+    let settings = Settings {
+        documents: Some(documents.clone()),
+        ..settings(&game, None)
+    };
+    let client = test_support::connect(router(settings)).await;
+    let query = || json!({ "query": "tvtLobby_AIGroup" });
+    let before = test_support::call(&client, "game_find", query()).await;
+
+    // -- Exec
+    write_pak(
+        &documents.join("addons/tvtLobby_5F2A6A1D2A3B4C5D/data.pak"),
+        &["Scripts/Game/tvtLobby/Adapters/tvtLobby_AIGroup.c"],
+    );
+    let after = test_support::call(&client, "game_find", query()).await;
+
+    // -- Check
+    assert!(
+        before.text.starts_with("No Game file has"),
+        "{}",
+        before.text
+    );
+    assert_eq!(
+        after.text,
+        "1 Game files match \"tvtLobby_AIGroup\":\n\
+         - Scripts/Game/tvtLobby/Adapters/tvtLobby_AIGroup.c (mod tvtLobby)"
+    );
+}
+
+#[tokio::test]
+async fn finds_a_mod_whose_pak_file_comes_after_its_folder() {
+    // -- Setup & Fixtures
+    let test = "finds_a_mod_whose_pak_file_comes_after_its_folder";
+    let game = game_folder(test, CAMERA_FILES);
+    let documents = game.with_file_name("documents");
+    let mod_folder = documents.join("addons/tvtLobby_5F2A6A1D2A3B4C5D");
+    fs::create_dir_all(&mod_folder).unwrap();
+    let settings = Settings {
+        documents: Some(documents),
+        ..settings(&game, None)
+    };
+    let client = test_support::connect(router(settings)).await;
+    let query = || json!({ "query": "tvtLobby_AIGroup" });
+    let before = test_support::call(&client, "game_find", query()).await;
+
+    // -- Exec
+    write_pak(
+        &mod_folder.join("data.pak"),
+        &["Scripts/Game/tvtLobby/Adapters/tvtLobby_AIGroup.c"],
+    );
+    let after = test_support::call(&client, "game_find", query()).await;
+
+    // -- Check
+    assert!(
+        before.text.starts_with("No Game file has"),
+        "{}",
+        before.text
+    );
+    assert_eq!(
+        after.text,
+        "1 Game files match \"tvtLobby_AIGroup\":\n\
+         - Scripts/Game/tvtLobby/Adapters/tvtLobby_AIGroup.c (mod tvtLobby)"
+    );
+}
+
+#[tokio::test]
+async fn names_the_profile_setting_when_it_has_no_addons_folder() {
+    // -- Setup & Fixtures
+    let test = "names_the_profile_setting_when_it_has_no_addons_folder";
+    let game = game_folder(test, CAMERA_FILES);
+    let profile = game.with_file_name("no-profile");
+
+    // -- Exec
+    let answer = find_in(
+        settings(&game, Some(&profile)),
+        json!({ "query": "CharacterCameraHandlerComponent.c" }),
+    )
+    .await;
+
+    // -- Check
+    assert!(
+        answer.text.contains(&format!(
+            "REFORGER_WORKBENCH_PROFILE_PATH is \"{}\", but {} is not a folder, so the search \
+             covered the game only. Set it to a folder of Workshop mods that holds addons",
+            profile.display(),
+            profile.join("addons").display()
+        )),
+        "{}",
+        answer.text
+    );
+}
+
+#[tokio::test]
+async fn lists_a_mod_in_the_profile_and_in_documents_once_from_documents() {
+    // -- Setup & Fixtures
+    let test = "lists_a_mod_in_the_profile_and_in_documents_once_from_documents";
+    let game = game_folder(test, CAMERA_FILES);
+    let profile = game.with_file_name("profile");
+    let documents = game.with_file_name("documents");
+    write_pak(
+        &profile.join("addons/tvtLobby_5F2A6A1D2A3B4C5D/data.pak"),
+        &["Scripts/Game/tvtLobby/Old.c"],
+    );
+    write_pak(
+        &documents.join("addons/tvtLobby_5f2a6a1d2a3b4c5d/data.pak"),
+        &["Scripts/Game/tvtLobby/New.c"],
+    );
+    let settings = Settings {
+        documents: Some(documents),
+        ..settings(&game, Some(&profile))
+    };
+
+    // -- Exec
+    let answer = find_in(settings, json!({ "query": "Scripts/Game/tvtLobby/" })).await;
+
+    // -- Check
+    assert_eq!(
+        answer.text,
+        "1 Game files match \"Scripts/Game/tvtLobby/\":\n\
+         - Scripts/Game/tvtLobby/New.c (mod tvtLobby)"
+    );
+}
+
+#[tokio::test]
 async fn names_the_setting_when_the_game_folder_is_not_set() {
     // -- Exec
     let answer = find_in(Settings::default(), json!({ "query": "Camera" })).await;
@@ -109,7 +240,7 @@ async fn names_the_setting_when_the_game_folder_has_no_pak_files() {
     let folder = out_folder("names_the_setting_when_the_game_folder_has_no_pak_files");
     let settings = Settings {
         game: Some(folder.display().to_string()),
-        profile: None,
+        ..Settings::default()
     };
 
     // -- Exec
@@ -251,7 +382,7 @@ async fn finds_the_camera_handler_script_in_the_installed_game_by_a_windows_and_
     for game in [wsl, windows] {
         let settings = Settings {
             game: Some(game.clone()),
-            profile: None,
+            ..Settings::default()
         };
         let answer = find_in(settings, json!({ "query": "CharacterCameraHandler" })).await;
         let first = answer.text.lines().nth(1).unwrap_or_default();
@@ -622,7 +753,7 @@ fn opens_a_sample_of_all_scripts_in_the_installed_game() {
     // -- Setup & Fixtures
     let settings = Settings {
         game: Settings::from_env().game,
-        profile: None,
+        ..Settings::default()
     };
     let index = build(&settings, &CancellationToken::new()).unwrap();
     let scripts: Vec<_> = index
@@ -679,6 +810,7 @@ fn settings(game: &Path, profile: Option<&Path>) -> Settings {
     Settings {
         game: Some(game.display().to_string()),
         profile: profile.map(|p| p.display().to_string()),
+        documents: None,
     }
 }
 

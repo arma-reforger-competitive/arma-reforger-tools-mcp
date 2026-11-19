@@ -68,3 +68,29 @@
 - Fixed: a compressed file is unpacked with zlib, not raw deflate (the old "invalid block type"), and the full size is checked against a 64 MB limit before memory is reserved. A real test opens every 20th script of the game.
 - Changed: capital letters in the path do not matter, and a wrong path gives the 5 closest real paths. In the old project, 27 of 42 reads failed on guessed paths. A binary file is found by a zero byte, not by a list of extensions. `source` picks the game or a mod when both have the path.
 - Not ported: the read of loose files outside the .pak files. The installed game has only .pak files.
+
+## reference_sync without Workbench (#74)
+
+- New Capability `reference-mods` with the Tool `reference_sync`. It is not a Port. It reads `reference-mods.jsonl` in each folder of `REFORGER_MODS_PATH` and keeps its own record in `<Workbench Documents folder>/addons/.reference-mods.jsonl`.
+- It deletes only a mod that is in the record and on no list. Projects, links, `saves`, and mods downloaded by hand stay. A bad setting or a bad list line stops the call before any delete.
+- A pure function makes the plan (delete, download, present). In this ticket a missing mod is a failed line with the message of the Workbench bridge: the download comes in a later ticket.
+- The `workbench` Capability now gives `Bridge` to other Capabilities, so the bridge stays the only way to call Workbench.
+
+## reference_sync downloads (#77)
+
+- The Handler script got the actions `reference_download` and `reference_progress`, with the steps that #19 proved: `RequestPage` with `"search": "<ID>"`, keep the item with that exact ID, `AskDetail`, then `Download` of `GetLatestRevision()`. The license name comes from `License()`.
+- The state of each download stays in Workbench memory between calls. A second start of the same ID starts nothing, unless its last try failed. One search runs at a time, because the Workshop keeps only the items of the last page.
+- The Handler version and the version in `Cargo.toml` went up to 0.2.0. A test checks that the script has both actions and every field that `reference_sync` reads. The compile and the real download need the real Workbench.
+
+## reference_sync review fixes (#72)
+
+- The record keeps a `started` line for each download that Workbench accepted, so a download that outlives the server is recorded and later deleted. The record is the only state. The Handler script answers `unknown` for a download that it does not know, and it starts a complete or failed download again. The search keeps only the item with the exact ID.
+- The wait ends at 30 seconds, progress questions included. `reference_sync` checks a cancel in its file work.
+- `game-files` builds its file list again also when a `.pak` file in a mod folder changes, so a mod whose `.pak` came after its folder shows with no restart. Its notes name the right setting.
+- One parse of the folder name `<Name>_<ID>` in `src/mod_folder.rs` for both Capabilities. ADR 0004 now lets `workbench` make `Bridge` public.
+
+## workbench_launch checks that Steam runs (#77)
+
+- The real Workbench check of #77 found the bug: Steam was closed, but `ActiveUser` in the registry still named the user. `workbench_launch` did not start Steam, and Workbench closed with `SteamAPI_Init failed. Is Steam running?`.
+- Now a user counts as logged in only when `steam.exe` runs (`tasklist.exe`) and `ActiveUser` is not 0. The check reads only the CSV row of `steam.exe`, because `tasklist.exe` writes its "no match" message in the language of Windows.
+- After the fix, the Tool started Steam and then Workbench. The four checks of #77 passed with `S3C_CameraFix`: downloaded, present, found by `game_find`, and deleted after its line went.

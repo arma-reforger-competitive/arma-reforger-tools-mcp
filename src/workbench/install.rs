@@ -59,6 +59,64 @@ mod tests {
             "set VERSION in ReforgerBridge.c to the version in Cargo.toml: {line}"
         );
     }
+
+    #[test]
+    fn handler_script_knows_the_actions_and_fields_of_reference_sync() {
+        // -- Setup & Fixtures
+        // The actions and the fields that `reference_sync` uses (see src/reference-mods/README.md).
+        let actions = ["\"reference_download\"", "\"reference_progress\""];
+        let fields = [
+            "id",
+            "state",
+            "percent",
+            "name",
+            "mod_version",
+            "license",
+            "reason",
+        ];
+
+        // -- Exec & Check
+        for action in actions {
+            assert!(
+                HANDLER_SCRIPT.contains(&format!("req.action == {action}")),
+                "the Handler script has no branch for the action {action}"
+            );
+        }
+        for field in fields {
+            assert!(
+                HANDLER_SCRIPT.contains(&format!("RegV(\"{field}\");")),
+                "the Handler script does not register the field \"{field}\""
+            );
+        }
+        for state in ["searching", "downloading", "complete", "failed", "unknown"] {
+            assert!(
+                HANDLER_SCRIPT.contains(&format!("\"{state}\"")),
+                "the Handler script never answers the state \"{state}\""
+            );
+        }
+    }
+
+    #[test]
+    fn handler_script_starts_a_download_again_unless_it_searches_or_downloads() {
+        // -- Setup & Fixtures
+        let start = HANDLER_SCRIPT
+            .split_once("static void Start(string id)")
+            .and_then(|(_, rest)| rest.split_once("static void SearchEnded()"))
+            .map(|(start, _)| start)
+            .unwrap();
+
+        // -- Exec & Check
+        assert!(
+            start.contains("if (download && download.IsRunning())\n\t\t\treturn;"),
+            "Start must skip only a download that runs: {start}"
+        );
+        assert!(
+            HANDLER_SCRIPT.contains(
+                "bool IsRunning()\n\t{\n\t\treturn m_State == \"searching\" || m_State == \"downloading\";"
+            ),
+            "IsRunning must be true only while the download searches or downloads"
+        );
+    }
 }
 
 // endregion: --- Tests

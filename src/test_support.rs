@@ -1,4 +1,7 @@
-//! Helpers for the tests of every Capability: the real server in memory, and a client.
+//! Helpers for the tests of every Capability: the real server in memory, a client, and a fake
+//! Workbench.
+
+pub mod fake_workbench;
 
 use rmcp::{
     ServiceExt,
