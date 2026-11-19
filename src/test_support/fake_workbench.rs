@@ -106,6 +106,9 @@ pub struct Workshop {
 
     /// The IDs that the Workshop does not have, and that the Handler script was asked to start.
     started_unknown: Mutex<BTreeSet<String>>,
+
+    /// How long the Handler script waits before it answers `reference_progress`.
+    progress_delay: Mutex<Duration>,
 }
 
 struct WorkshopMod {
@@ -127,6 +130,7 @@ impl Workshop {
             addons,
             mods: Mutex::new(BTreeMap::new()),
             started_unknown: Mutex::new(BTreeSet::new()),
+            progress_delay: Mutex::new(Duration::ZERO),
         })
     }
 
@@ -151,6 +155,11 @@ impl Workshop {
     pub fn finish(&self, id: &str) {
         let mut mods = self.mods.lock().unwrap();
         self.complete(id, mods.get_mut(id).unwrap());
+    }
+
+    /// Makes each answer to `reference_progress` come after `delay`.
+    pub fn answer_progress_after(&self, delay: Duration) {
+        *self.progress_delay.lock().unwrap() = delay;
     }
 
     /// Workbench loads the scripts again: the Handler script forgets every download. The folders
@@ -246,6 +255,17 @@ pub fn serve(listener: TcpListener, reply: Arc<Reply>) {
                 }
                 let mut request = Vec::new();
                 stream.read_to_end(&mut request).await.unwrap();
+                if let Reply::Workbench {
+                    workshop: Some(workshop),
+                    ..
+                } = reply.as_ref()
+                {
+                    let payload: Value = serde_json::from_slice(last_string(&request)).unwrap();
+                    if payload["action"] == "reference_progress" {
+                        let delay = *workshop.progress_delay.lock().unwrap();
+                        tokio::time::sleep(delay).await;
+                    }
+                }
                 let bytes = match reply.as_ref() {
                     Reply::Silent => {
                         tokio::time::sleep(Duration::from_secs(60)).await;

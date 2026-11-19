@@ -475,6 +475,39 @@ async fn never_records_or_deletes_a_listed_mod_that_the_user_downloaded_by_hand(
     assert!(!setup.addons().join(".reference-mods.jsonl").exists());
 }
 
+#[tokio::test]
+async fn stops_a_progress_question_at_the_end_of_the_wait() {
+    // -- Setup & Fixtures
+    let setup = Setup::new();
+    setup.list(
+        "TvtMission",
+        &format!(r#"{{"id":"{MISSING}","name":"S3C_CameraFix"}}"#),
+    );
+    let workshop = Workshop::new(setup.addons());
+    workshop.add(MISSING, "S3C_CameraFix", "1.0.2", "APL-SA", 40);
+    // Each answer comes after the wait of 100 ms, but inside the 300 ms limit of the bridge.
+    workshop.answer_progress_after(Duration::from_millis(250));
+    let port = fake_workbench(
+        Reply::workbench(Some(env!("CARGO_PKG_VERSION")), Reload::Loads)
+            .with_workshop(Arc::clone(&workshop)),
+    )
+    .await;
+    let client = setup.client(port).await;
+
+    // -- Exec
+    let begin = std::time::Instant::now();
+    let answer = test_support::call(&client, "reference_sync", json!({})).await;
+    let took = begin.elapsed();
+
+    // -- Check
+    assert_eq!(
+        answer.text,
+        format!("S3C_CameraFix ({MISSING}), license unknown: downloading 0%")
+    );
+    assert!(took < Duration::from_millis(200), "the call took {took:?}");
+    assert_eq!(setup.record_text(), started_line(MISSING, "S3C_CameraFix"));
+}
+
 // -- Test Support
 
 /// A temp folder of mod repos and a temp Workbench folder in Documents.

@@ -332,7 +332,8 @@ pub(super) fn folder_of<'a>(id: &ModId, folders: &'a [String]) -> Option<&'a Str
     folders.iter().find(|folder| id.names(folder))
 }
 
-/// The license name of a mod that is not in the record.
+/// The license name of a mod that is not in the record. A mod that Workbench forgot has it as its
+/// version too.
 pub(super) fn unknown_license() -> String {
     UNKNOWN_LICENSE.to_owned()
 }

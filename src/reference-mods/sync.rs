@@ -91,53 +91,32 @@ pub(super) async fn sync(
     let mut states: Vec<Option<State>> = Vec::new();
     let mut known: BTreeMap<usize, Known> = BTreeMap::new();
     let mut started_any = false;
+    let deadline = Instant::now() + wait.total;
     for (index, planned) in reference.iter().enumerate() {
         let id = &planned.listed.id;
-        let start = match &planned.action {
-            Action::Present { .. } => false,
-            Action::Download => true,
-            Action::Follow { folder } => match progress(bridge, id).await {
-                Known::Answer(Progress::Unknown) if folder.is_some() => {
-                    // Workbench lost the download, for example after a restart, but its folder
-                    // is on disk.
-                    known.insert(
-                        index,
-                        Known::Answer(Progress::Complete {
-                            version: unknown_license(),
-                            license: unknown_license(),
-                        }),
-                    );
-                    false
-                }
-                Known::Answer(Progress::Unknown) => true,
-                now => {
-                    known.insert(index, now);
-                    false
-                }
-            },
-        };
-        let state = match &planned.action {
-            Action::Present { .. } => Some(State::Present),
-            Action::Download | Action::Follow { .. } if !start => None,
-            Action::Download | Action::Follow { .. } => {
-                match bridge.call("reference_download", id_param(id)).await {
-                    Ok(_) => {
-                        set(
-                            &mut record,
-                            Recorded::Started {
-                                id: id.to_string(),
-                                name: planned.listed.name.clone(),
-                            },
-                        );
-                        started_any = true;
-                        known.insert(index, Known::Answer(Progress::Running { percent: 0 }));
-                        None
-                    }
-                    Err(error) => Some(State::Failed {
-                        reason: error.to_string(),
-                    }),
-                }
+        let state = match first_step(bridge, wait, deadline, planned).await {
+            Step::Present => Some(State::Present),
+            Step::Known(now) => {
+                known.insert(index, now);
+                None
             }
+            Step::Start => match bridge.call("reference_download", id_param(id)).await {
+                Ok(_) => {
+                    set(
+                        &mut record,
+                        Recorded::Started {
+                            id: id.to_string(),
+                            name: planned.listed.name.clone(),
+                        },
+                    );
+                    started_any = true;
+                    known.insert(index, Known::Answer(Progress::Running { percent: 0 }));
+                    None
+                }
+                Err(error) => Some(State::Failed {
+                    reason: error.to_string(),
+                }),
+            },
         };
         states.push(state);
     }
@@ -147,7 +126,7 @@ pub(super) async fn sync(
         blocking(move || write_record(&file, &kept)).await?;
     }
 
-    wait_for(bridge, wait, &reference, &mut known).await;
+    wait_for(bridge, wait, deadline, &reference, &mut known).await;
     let ids: BTreeMap<usize, ModId> = known
         .keys()
         .filter_map(|&index| Some((index, reference.get(index)?.listed.id.clone())))
@@ -259,25 +238,69 @@ enum Known {
     NoAnswer { reason: String },
 }
 
-/// Asks Workbench for the progress of the download of `id`.
-async fn progress(bridge: &Bridge, id: &ModId) -> Known {
-    match bridge.call("reference_progress", id_param(id)).await {
+/// What the call does first with a Reference mod.
+enum Step {
+    Present,
+
+    /// Start its download.
+    Start,
+
+    /// Wait for its download, which Workbench knows.
+    Known(Known),
+}
+
+/// The first step for `planned`. For a started download, it asks Workbench for the progress
+/// first: when Workbench does not know the download, a folder on disk makes it complete with
+/// version and license "unknown", and no folder makes it start again.
+async fn first_step(bridge: &Bridge, wait: &Wait, deadline: Instant, planned: &Planned) -> Step {
+    let folder = match &planned.action {
+        Action::Present { .. } => return Step::Present,
+        Action::Download => return Step::Start,
+        Action::Follow { folder } => folder,
+    };
+    let now = ask(bridge, &planned.listed.id, deadline)
+        .await
+        .unwrap_or_else(|| Known::NoAnswer {
+            reason: format!(
+                "Workbench did not answer the progress question within the wait of {} seconds",
+                wait.total.as_secs()
+            ),
+        });
+    match (now, folder) {
+        (Known::Answer(Progress::Unknown), Some(_)) => {
+            Step::Known(Known::Answer(Progress::Complete {
+                version: unknown_license(),
+                license: unknown_license(),
+            }))
+        }
+        (Known::Answer(Progress::Unknown), None) => Step::Start,
+        (now, _) => Step::Known(now),
+    }
+}
+
+/// Asks Workbench for the progress of the download of `id`. `None`: Workbench gave no answer
+/// before `deadline`, so the question stopped.
+async fn ask(bridge: &Bridge, id: &ModId, deadline: Instant) -> Option<Known> {
+    let call = bridge.call("reference_progress", id_param(id));
+    let known = match tokio::time::timeout_at(deadline, call).await.ok()? {
         Ok((answer, _)) => Known::Answer(parse_progress(&answer)),
         Err(error) => Known::NoAnswer {
             reason: error.to_string(),
         },
-    }
+    };
+    Some(known)
 }
 
 /// Asks for the progress of each running download in `known` about every `wait.poll`, until each
-/// one ends, or until `wait.total` ends. Keeps the last progress of each in `known`.
+/// one ends, or until `deadline`. It starts no progress question after `deadline`, and it stops a
+/// question that has no answer at `deadline`. Keeps the last progress of each in `known`.
 async fn wait_for(
     bridge: &Bridge,
     wait: &Wait,
+    deadline: Instant,
     reference: &[Planned],
     known: &mut BTreeMap<usize, Known>,
 ) {
-    let deadline = Instant::now() + wait.total;
     loop {
         for (&index, now) in known.iter_mut() {
             if !matches!(now, Known::Answer(Progress::Running { .. })) {
@@ -286,7 +309,11 @@ async fn wait_for(
             let Some(planned) = reference.get(index) else {
                 continue;
             };
-            *now = progress(bridge, &planned.listed.id).await;
+            // At the deadline, the download keeps its last progress.
+            let Some(answer) = ask(bridge, &planned.listed.id, deadline).await else {
+                return;
+            };
+            *now = answer;
         }
         let running = known
             .values()
