@@ -25,16 +25,17 @@ Finds and opens Game files: the scripts, prefabs, configs, and other files insid
 Set them in the `env` of Claude Code's `settings.json`. A path works in Windows form (`D:\Games\...`) and in WSL form (`/mnt/d/Games/...`). Restart Claude Code after a change.
 
 - `REFORGER_GAME_PATH`: the game folder, the folder that holds `ArmaReforger.exe` and `addons`. Without it, or when it has no `addons` folder with .pak files, `game_find` and `game_read` give an error that names the setting.
-- `REFORGER_WORKBENCH_PROFILE_PATH`: the Workbench profile folder, for example `C:\Users\<you>\Documents\My Games\ArmaReforgerWorkbench`. Without it, `game_find` and `game_read` use the game only, and `game_find` says so. This is not `REFORGER_WORKBENCH_DOCUMENTS_PATH` of `workbench`: this setting names the folder that holds `addons`, the mods that Workbench downloaded, and a user can move it out of Documents.
+- `REFORGER_WORKBENCH_DOCUMENTS_PATH`: the Workbench folder in Documents, for example `C:\Users\<you>\Documents\My Games\ArmaReforgerWorkbench`. Workbench downloads Workshop mods to its `addons` folder. Without it, `game-files` finds the folder the same way as `workbench` (`src/workbench_documents.rs`).
+- `REFORGER_WORKBENCH_PROFILE_PATH`: a second folder that holds `addons` with Workshop mods, for example `D:\DownloadedMods`, the folder where the game downloads mods. Without it and without a Documents folder, `game_find` and `game_read` use the game only, and `game_find` says so.
 
 ## Data
 
 The file lists come from the FILE table of each .pak archive:
 
 - The game: every `.pak` file in `<game>/addons` and one folder down, for example `addons/data/data007.pak`. The game has 19 archives with about 251,000 files.
-- The mods: every `.pak` file in `<profile>/addons/<Name>_<ID>/`. The mod name is the folder name without the 16-digit ID.
+- The mods: every `.pak` file in `<Documents folder>/addons/<Name>_<ID>/` and in `<profile>/addons/<Name>_<ID>/`. The mod name is the folder name without the 16-digit ID. When the same mod ID is in both folders, the mod is listed once, from the Documents folder.
 
-The first `game_find` or `game_read` call reads all file lists, outside the server thread, in about a second. The server keeps them until it stops, so a mod that you download later shows after a restart. A damaged .pak file is skipped, and the answer names it.
+The first `game_find` or `game_read` call reads all file lists, outside the server thread, in about a second. Before each later call, `game-files` lists the mod folders in both `addons` folders. When they differ from the folders at the last build, it reads all file lists again, so a mod that Workbench downloads shows with no restart. A damaged .pak file is skipped, and the answer names it.
 
 `pak.rs` reads the FILE table and the content of one file. It is translated from `src/pak/reader.ts` and `src/pak/vfs.ts` of enfusion-mcp, with three changes:
 
