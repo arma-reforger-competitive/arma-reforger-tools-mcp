@@ -1,6 +1,6 @@
 ---
 name: workbench-test
-description: Test a Workbench Tool on the real Workbench of the owner - start it with a test mod, send raw NET API calls, and close it. Use when a change to src/workbench/ needs a test on the real Workbench, or when a Workbench Tool gives an answer you must debug.
+description: Test a Workbench Tool on the real Workbench of the owner - start it with a test mod, send raw NET API calls, and close it. Use when a change to src/workbench/, or to another Tool that calls Workbench, needs a test on the real Workbench, or when a Workbench Tool gives an answer you must debug.
 ---
 
 This skill holds only what a user of the plugin does not need. To start Workbench and to check its state, use the Tools of the plugin, the same way a user does.
@@ -12,13 +12,12 @@ This skill holds only what a user of the plugin does not need. To start Workbenc
 2. **Start Workbench with the test mod.** Ask the owner before you start Workbench. Use the test mod `BridgeTest` (`D:\ArmaReforgerWorkbench\BridgeTest`), not a real mod of the owner.
 
    ```sh
-   npx -y @modelcontextprotocol/inspector@2.15.0 --cli -e 'REFORGER_WORKBENCH_PROFILE_PATH=D:\DownloadedMods' \
-     target/release/reforger --method tools/call --tool-name workbench_launch --tool-arg mod=BridgeTest
+   node .claude/skills/workbench-test/tool.ts workbench_launch mod=BridgeTest
    ```
 
-   The step is done when the answer says the mod is loaded. On Workbench 1.6 this takes 8 to 15 seconds. When Workbench runs already, the Tool starts nothing. Then check with `workbench_status` which mod is open.
+   The step is done when the answer says the mod is loaded. On Workbench 1.6 this takes 8 to 15 seconds, and longer when the Tool starts Steam first. When Workbench runs already, the Tool starts nothing. Then check with `workbench_status` which mod is open.
 
-3. **Test.** Call the Tool that you changed with MCP Inspector, as in step 2. To see what Workbench itself answers, send a raw call (see "Raw NET API calls").
+3. **Test.** Call the Tool that you changed with `tool.ts`, as in step 2. To see what Workbench itself answers, send a raw call (see "Raw NET API calls").
 
 4. **Clean up.** Put back each file of `BridgeTest` that the test changed. When the mod did not load, the bridge could write into the game. Check that `D:\Games\steamapps\common\Arma Reforger\addons\data` has no `Scripts` folder.
 
@@ -29,6 +28,21 @@ This skill holds only what a user of the plugin does not need. To start Workbenc
    ```
 
    It asks Workbench to close, and stops it by force after 20 seconds. No Tool does this, because a forced stop loses unsaved work.
+
+## Tool calls
+
+`tool.ts` in this folder calls one Tool through MCP Inspector and prints only the answer of the Tool. Each input is one `name=value`. It exits with 1 when the answer is an error.
+
+- It passes every `REFORGER_*` setting of the `env` in `~/.claude/settings.json`, as Claude Code does. A `REFORGER_*` variable in the shell wins.
+- It lets one call run 300 seconds. MCP Inspector alone stops a call after 60 seconds, which is shorter than `workbench_launch` can take.
+
+Test `reference_sync` with test lists, never with the owner's mod repos: put a `reference-mods.jsonl` in a subfolder of a temp folder, and set `REFORGER_MODS_PATH` to the temp folder.
+
+```sh
+mkdir -p /tmp/ref-test/TestRepo
+echo '{"id":"6A09759015FFDA26","name":"S3C_CameraFix"}' > /tmp/ref-test/TestRepo/reference-mods.jsonl
+REFORGER_MODS_PATH=/tmp/ref-test node .claude/skills/workbench-test/tool.ts reference_sync
+```
 
 ## Raw NET API calls
 
