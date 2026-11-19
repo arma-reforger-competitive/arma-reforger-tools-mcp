@@ -49,7 +49,7 @@ Set them in the `env` of Claude Code's `settings.json`. A path works in Windows 
 
 ## How it works
 
-`plan.rs` holds the pure logic: the parse of a list line and of the record, the plan, and the text of the answer. The plan takes the lists, the record, and the folder names in `addons`. It gives three groups: delete (in the record and on no list), download (listed and not on disk), and present (listed and on disk). A mod is on disk when `addons` has a folder whose name ends in `_<ID>`. `sync.rs` is the thin outer layer: it reads the files, deletes the folders, writes the record, and calls the bridge. The server keeps in memory the downloads that it started and that have not ended. For such a mod, a later call asks only for the progress, also when its folder is on disk already.
+`plan.rs` holds the pure logic: the parse of a list line and of the record, the plan, and the text of the answer. The plan takes the lists, the record, and the folder names in `addons`. It gives three groups: delete (in the record and on no list), download (listed and not on disk), and present (listed and on disk). A mod is on disk when `addons` has a folder `<Name>_<ID>` with a name that is not empty (`src/mod_folder.rs` parses the name). `sync.rs` is the thin outer layer: it reads the files, deletes the folders, writes the record, and calls the bridge. The server keeps in memory the downloads that it started and that have not ended. For such a mod, a later call asks only for the progress, also when its folder is on disk already.
 
 ## The Handler actions
 

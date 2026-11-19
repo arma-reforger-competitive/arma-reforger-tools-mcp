@@ -149,7 +149,7 @@ pub(super) async fn sync(
                     State::Failed {
                         reason: format!(
                             "Workbench says that the download is complete, but addons has no \
-                             folder whose name ends in _{id}"
+                             folder <Name>_{id}"
                         ),
                     }
                 }

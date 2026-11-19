@@ -11,6 +11,7 @@ use super::pak::{FileData, PakFile, list_files, read_file};
 use super::settings::{PROFILE_SETTING, Settings};
 use super::{Error, Result};
 use crate::host_path::host_path;
+use crate::mod_folder::ModFolder;
 
 /// The name of the first source: the game itself.
 const GAME: &str = "game";
@@ -230,24 +231,17 @@ fn sub_folders(folder: &Path) -> Option<Vec<PathBuf>> {
 /// whole folder name.
 fn mod_key(folder: &Path) -> String {
     let name = folder.file_name().unwrap_or_default().to_string_lossy();
-    match split_id(&name) {
-        Some((_, id)) => id.to_ascii_uppercase(),
+    match ModFolder::parse(&name) {
+        Some(parts) => parts.id.to_ascii_uppercase(),
         None => name.into_owned(),
     }
 }
 
-/// The name and the 16-digit hex ID of a mod folder `<Name>_<ID>`.
-fn split_id(folder: &str) -> Option<(&str, &str)> {
-    let (name, id) = folder.rsplit_once('_')?;
-    (!name.is_empty() && id.len() == 16 && id.chars().all(|c| c.is_ascii_hexdigit()))
-        .then_some((name, id))
-}
-
-/// The name of a mod from its folder `<Name>_<ID>`, where the ID has 16 hex digits.
+/// The name of a mod from its folder `<Name>_<ID>`, or else the whole folder name.
 fn mod_name(folder: &Path) -> String {
     let folder = folder.file_name().unwrap_or_default().to_string_lossy();
-    match split_id(&folder) {
-        Some((name, _)) => name.to_owned(),
+    match ModFolder::parse(&folder) {
+        Some(parts) => parts.name.to_owned(),
         None => folder.into_owned(),
     }
 }

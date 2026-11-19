@@ -7,6 +7,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value};
 
 use super::error::BadLine;
+use crate::mod_folder::ModFolder;
 
 /// The license name of a mod that is not in the record.
 const UNKNOWN_LICENSE: &str = "unknown";
@@ -23,18 +24,9 @@ impl ModId {
             .then(|| Self(raw.to_ascii_uppercase()))
     }
 
-    /// Whether the folder `name` in `addons` is this mod: its name ends in `_<ID>`.
+    /// Whether the folder `folder` in `addons` is this mod: its name is `<Name>_<ID>`.
     fn names(&self, folder: &str) -> bool {
-        folder
-            .len()
-            .checked_sub(17)
-            .and_then(|start| folder.get(start..))
-            .is_some_and(|end| {
-                end.starts_with('_')
-                    && end
-                        .get(1..)
-                        .is_some_and(|id| id.eq_ignore_ascii_case(&self.0))
-            })
+        ModFolder::parse(folder).is_some_and(|parts| parts.is(&self.0))
     }
 }
 
@@ -263,19 +255,14 @@ pub(super) fn parse_progress(answer: &Map<String, Value>) -> Progress {
     }
 }
 
-/// The folder of the mod `id` in `folders`: the name that ends in `_<ID>`.
+/// The folder of the mod `id` in `folders`: the name `<Name>_<ID>`.
 pub(super) fn folder_of<'a>(id: &ModId, folders: &'a [String]) -> Option<&'a String> {
     folders.iter().find(|folder| id.names(folder))
 }
 
-/// The name of a recorded mod: its folder name without `_<ID>`.
+/// The name of a recorded mod: the name in its folder `<Name>_<ID>`.
 pub(super) fn recorded_name(entry: &Recorded) -> &str {
-    entry
-        .folder
-        .len()
-        .checked_sub(17)
-        .and_then(|end| entry.folder.get(..end))
-        .unwrap_or(&entry.folder)
+    ModFolder::parse(&entry.folder).map_or(&entry.folder, |parts| parts.name)
 }
 
 /// The license name of a mod that is not in the record.
@@ -339,7 +326,11 @@ mod tests {
             recorded("6AA81EE549F50CB7", "tvtLobby_6AA81EE549F50CB7"),
             recorded("5965770215E93269", "OldMod_5965770215E93269"),
         ];
-        let folders = ["tvtLobby_6aa81ee549f50cb7".to_owned(), "saves".to_owned()];
+        let folders = [
+            "tvtLobby_6aa81ee549f50cb7".to_owned(),
+            "_6A09759015FFDA26".to_owned(),
+            "saves".to_owned(),
+        ];
 
         // -- Exec
         let plan = plan(&lists, &record, &folders);
