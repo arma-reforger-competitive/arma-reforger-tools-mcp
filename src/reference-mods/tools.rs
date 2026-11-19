@@ -5,6 +5,7 @@ use std::sync::Arc;
 use rmcp::handler::server::router::tool::ToolRouter;
 use rmcp::model::{CallToolResult, ContentBlock, Tool, ToolAnnotations};
 use serde_json::Map;
+use tokio_util::sync::CancellationToken;
 
 use super::sync::{Settings, Started, Wait, sync};
 use crate::workbench::Bridge;
@@ -38,11 +39,11 @@ fn router_with<S: Send + Sync + 'static>(
     )
     .with_title("Sync the Reference mods")
     .annotate(labels());
-    ToolRouter::new().with_route((reference_sync, move || {
+    ToolRouter::new().with_route((reference_sync, move |cancel: CancellationToken| {
         let state = Arc::clone(&state);
         async move {
             let (settings, bridge, wait, started) = state.as_ref();
-            match sync(settings, bridge, wait, started).await {
+            match sync(settings, bridge, wait, started, cancel).await {
                 Ok(text) => CallToolResult::success(vec![ContentBlock::text(text)]),
                 Err(error) => CallToolResult::error(vec![ContentBlock::text(error.to_string())]),
             }

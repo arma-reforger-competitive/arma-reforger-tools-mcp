@@ -12,6 +12,7 @@ use std::time::Duration;
 
 use serde_json::{Map, Value};
 use tokio::time::Instant;
+use tokio_util::sync::CancellationToken;
 
 use super::error::BadLine;
 use super::plan::{
@@ -79,10 +80,13 @@ pub(super) async fn sync(
     bridge: &Bridge,
     wait: &Wait,
     started: &Started,
+    cancel: CancellationToken,
 ) -> Result<String> {
     let mods = settings.mods.clone();
     let documents = settings.documents.clone();
-    let cleaned = blocking(move || clean(mods.as_deref(), documents.as_deref())).await?;
+    let clean_cancel = cancel.clone();
+    let cleaned =
+        blocking(move || clean(mods.as_deref(), documents.as_deref(), &clean_cancel)).await?;
 
     let mut states: Vec<Option<State>> = Vec::new();
     let mut waiting = Vec::new();
@@ -122,7 +126,8 @@ pub(super) async fn sync(
         .collect();
     let addons = cleaned.addons.clone();
     let mut record = cleaned.record;
-    let recorded = blocking(move || add_to_record(&addons, &mut record, &complete)).await?;
+    let recorded =
+        blocking(move || add_to_record(&addons, &mut record, &complete, &cancel)).await?;
 
     let mut lines = Vec::new();
     for (index, planned) in cleaned.reference.iter().enumerate() {
@@ -181,7 +186,13 @@ struct Cleaned {
 }
 
 /// Reads the settings, the lists, and the record, makes the plan, deletes, and writes the record.
-fn clean(mods: Option<&str>, documents: Option<&str>) -> Result<Cleaned> {
+/// It checks `cancel` before each list and each delete. After a cancel, the record names only the
+/// folders that are still on disk.
+fn clean(
+    mods: Option<&str>,
+    documents: Option<&str>,
+    cancel: &CancellationToken,
+) -> Result<Cleaned> {
     let mods = mods.ok_or(Error::ModsNotSet).map(host_path)?;
     if !mods.is_dir() {
         return Err(Error::ModsNotFolder { folder: mods });
@@ -189,7 +200,7 @@ fn clean(mods: Option<&str>, documents: Option<&str>) -> Result<Cleaned> {
     let addons = workbench_documents(documents)
         .ok_or(Error::DocumentsNotFound)?
         .join("addons");
-    let lists = read_lists(&mods)?;
+    let lists = read_lists(&mods, cancel)?;
     let record_file = addons.join(RECORD_FILE);
     let mut record = read_record(&record_file)?;
     let folders = folder_names(&addons)?;
@@ -198,6 +209,9 @@ fn clean(mods: Option<&str>, documents: Option<&str>) -> Result<Cleaned> {
 
     let mut deleted = Vec::new();
     for entry in &plan.delete {
+        if cancel.is_cancelled() {
+            break;
+        }
         let state = delete(&addons.join(&entry.folder));
         if matches!(state, State::Deleted) {
             record.retain(|kept| kept != entry);
@@ -214,6 +228,9 @@ fn clean(mods: Option<&str>, documents: Option<&str>) -> Result<Cleaned> {
         .any(|line| matches!(line.state, State::Deleted))
     {
         write_record(&record_file, &record)?;
+    }
+    if cancel.is_cancelled() {
+        return Err(Error::Cancelled);
     }
     Ok(Cleaned {
         reference: plan.reference,
@@ -272,6 +289,7 @@ fn add_to_record(
     addons: &Path,
     record: &mut Vec<Recorded>,
     complete: &[(ModId, String, String)],
+    cancel: &CancellationToken,
 ) -> Result<BTreeSet<ModId>> {
     if complete.is_empty() {
         return Ok(BTreeSet::new());
@@ -279,6 +297,9 @@ fn add_to_record(
     let folders = folder_names(addons)?;
     let mut added = BTreeSet::new();
     for (id, version, license) in complete {
+        if cancel.is_cancelled() {
+            return Err(Error::Cancelled);
+        }
         let Some(folder) = folder_of(id, &folders) else {
             continue;
         };
@@ -324,8 +345,9 @@ fn lock(started: &Started) -> MutexGuard<'_, BTreeSet<ModId>> {
     started.lock().unwrap_or_else(PoisonError::into_inner)
 }
 
-/// The Reference mods of the lists in each direct subfolder of `mods`, in folder order.
-fn read_lists(mods: &Path) -> Result<Vec<Listed>> {
+/// The Reference mods of the lists in each direct subfolder of `mods`, in folder order. It checks
+/// `cancel` before each list.
+fn read_lists(mods: &Path, cancel: &CancellationToken) -> Result<Vec<Listed>> {
     let mut repos: Vec<PathBuf> = fs::read_dir(mods)
         .map_err(|err| Error::ReadFailed {
             path: mods.to_owned(),
@@ -337,6 +359,9 @@ fn read_lists(mods: &Path) -> Result<Vec<Listed>> {
     repos.sort();
     let mut lists = Vec::new();
     for repo in repos {
+        if cancel.is_cancelled() {
+            return Err(Error::Cancelled);
+        }
         let file = repo.join(LIST_FILE);
         let text = match fs::read_to_string(&file) {
             Ok(text) => text,
@@ -441,3 +466,40 @@ fn line(listed: &Listed, license: String, state: State) -> Line {
 }
 
 // endregion: --- Support
+
+// region:    --- Tests
+
+#[cfg(test)]
+mod tests {
+    use tempfile::TempDir;
+
+    use super::*;
+
+    #[test]
+    fn deletes_nothing_after_a_cancel() {
+        // -- Setup & Fixtures
+        let mods = TempDir::new().unwrap();
+        let documents = TempDir::new().unwrap();
+        let addons = documents.path().join("addons");
+        let folder = addons.join("OldMod_5965770215E93269");
+        fs::create_dir_all(&folder).unwrap();
+        let record = "{\"id\":\"5965770215E93269\",\"folder\":\"OldMod_5965770215E93269\",\
+                      \"version\":\"1.0.0\",\"license\":\"MIT\"}\n";
+        fs::write(addons.join(RECORD_FILE), record).unwrap();
+        let cancel = CancellationToken::new();
+        cancel.cancel();
+
+        // -- Exec
+        let result = clean(mods.path().to_str(), documents.path().to_str(), &cancel);
+
+        // -- Check
+        assert!(matches!(result, Err(Error::Cancelled)));
+        assert!(folder.is_dir());
+        assert_eq!(
+            fs::read_to_string(addons.join(RECORD_FILE)).unwrap(),
+            record
+        );
+    }
+}
+
+// endregion: --- Tests

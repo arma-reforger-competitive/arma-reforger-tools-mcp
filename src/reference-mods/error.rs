@@ -1,5 +1,5 @@
 //! Errors of the reference-mods Capability. Each one stops `reference_sync` before any delete,
-//! except `WriteRecord`, which comes after the deletes.
+//! except `WriteRecord` and `Cancelled`, which can come after a delete.
 
 use std::fmt;
 use std::path::PathBuf;
@@ -37,6 +37,9 @@ pub enum Error {
         file: PathBuf,
         err: std::io::Error,
     },
+
+    /// Claude cancelled the call.
+    Cancelled,
 
     /// The work on the files stopped with a panic.
     Stopped,
@@ -99,6 +102,11 @@ impl fmt::Display for Error {
                  the folder is not read-only, then call again.",
                 file.display()
             ),
+            Self::Cancelled => write!(
+                f,
+                "The call was cancelled. The record names only the mod folders that are still on \
+                 disk. Call again to finish the sync."
+            ),
             Self::Stopped => write!(
                 f,
                 "The work on the files stopped with an error inside the Tool. Call again."
@@ -133,6 +141,7 @@ impl std::error::Error for Error {
             | Self::DocumentsNotFound
             | Self::BadListLine { .. }
             | Self::BadRecordLine { .. }
+            | Self::Cancelled
             | Self::Stopped => None,
         }
     }
