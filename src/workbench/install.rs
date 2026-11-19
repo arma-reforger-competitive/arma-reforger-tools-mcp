@@ -89,6 +89,37 @@ mod tests {
             );
         }
     }
+
+    #[test]
+    fn handler_script_starts_a_download_again_unless_it_searches_or_downloads() {
+        // -- Setup & Fixtures
+        let start = HANDLER_SCRIPT
+            .split_once("static void Start(string id)")
+            .and_then(|(_, rest)| rest.split_once("static void SearchEnded()"))
+            .map(|(start, _)| start)
+            .unwrap();
+
+        // -- Exec & Check
+        assert!(
+            start.contains("if (download && download.IsRunning())\n\t\t\treturn;"),
+            "Start must skip only a download that runs: {start}"
+        );
+        assert!(
+            HANDLER_SCRIPT.contains(
+                "bool IsRunning()\n\t{\n\t\treturn m_State == \"searching\" || m_State == \"downloading\";"
+            ),
+            "IsRunning must be true only while the download searches or downloads"
+        );
+    }
+
+    #[test]
+    fn handler_script_keeps_only_the_search_item_with_the_exact_id() {
+        // -- Exec & Check
+        assert!(
+            !HANDLER_SCRIPT.contains("FindItem"),
+            "the Handler script must take the item only from the search page"
+        );
+    }
 }
 
 // endregion: --- Tests

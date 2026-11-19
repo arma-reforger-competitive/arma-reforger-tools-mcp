@@ -111,8 +111,6 @@ class ReforgerBridgeDownload
 					break;
 				}
 			}
-			if (!m_Item)
-				m_Item = workshop.FindItem(m_Id);
 		}
 		ReforgerBridgeDownloads.SearchEnded();
 		if (!m_Item)
@@ -173,6 +171,11 @@ class ReforgerBridgeDownload
 		return m_State == "failed";
 	}
 
+	bool IsRunning()
+	{
+		return m_State == "searching" || m_State == "downloading";
+	}
+
 	void Answer(ReforgerBridgeResponse response)
 	{
 		response.state = m_State;
@@ -224,12 +227,13 @@ class ReforgerBridgeDownloads
 		return key;
 	}
 
-	// Starts the download of `id`. When a download of `id` runs or is complete, it starts nothing.
+	// Starts the download of `id`. When a download of `id` searches or downloads, it starts nothing.
+	// A complete or a failed download starts again, because its mod folder can be gone.
 	static void Start(string id)
 	{
 		string key = Key(id);
 		ReforgerBridgeDownload download = s_Downloads.Get(key);
-		if (download && !download.IsFailed())
+		if (download && download.IsRunning())
 			return;
 		download = new ReforgerBridgeDownload(key);
 		s_Downloads.Set(key, download);

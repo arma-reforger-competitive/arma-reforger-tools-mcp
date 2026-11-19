@@ -55,5 +55,5 @@ Set them in the `env` of Claude Code's `settings.json`. A path works in Windows 
 
 `reference_sync` calls two actions of the Handler script, each with the parameter `id`:
 
-- `reference_download`: starts the download of the mod `id`. When a download of that ID already runs, it starts nothing.
+- `reference_download`: starts the download of the mod `id`. When a download of that ID searches or downloads, it starts nothing. A complete or a failed download starts again, because its folder can be gone. The search keeps only the item with that exact ID: an ID that the search does not find is a failed download.
 - `reference_progress`: answers `state` (`searching`, `downloading`, `complete`, or `failed`), and where they apply: `percent` (a whole number from 0 to 100), `name`, `mod_version`, `license`, and `reason`. The mod version is in `mod_version`, because the bridge uses `version` for the version of the Handler script.
