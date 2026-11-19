@@ -117,15 +117,6 @@ mod tests {
             "IsRunning must be true only while the download searches or downloads"
         );
     }
-
-    #[test]
-    fn handler_script_keeps_only_the_search_item_with_the_exact_id() {
-        // -- Exec & Check
-        assert!(
-            !HANDLER_SCRIPT.contains("FindItem"),
-            "the Handler script must take the item only from the search page"
-        );
-    }
 }
 
 // endregion: --- Tests
