@@ -35,7 +35,7 @@ The file lists come from the FILE table of each .pak archive:
 - The game: every `.pak` file in `<game>/addons` and one folder down, for example `addons/data/data007.pak`. The game has 19 archives with about 251,000 files.
 - The mods: every `.pak` file in `<Documents folder>/addons/<Name>_<ID>/` and in `<profile>/addons/<Name>_<ID>/`. The mod name is the folder name without the 16-digit ID. When the same mod ID is in both folders, the mod is listed once, from the Documents folder.
 
-The first `game_find` or `game_read` call reads all file lists, outside the server thread, in about a second. Before each later call, `game-files` lists the mod folders in both `addons` folders. When they differ from the folders at the last build, it reads all file lists again, so a mod that Workbench downloads shows with no restart. A damaged .pak file is skipped, and the answer names it.
+The first `game_find` or `game_read` call reads all file lists, outside the server thread, in about a second. Before each later call, `game-files` lists the mod folders in both `addons` folders and the .pak files in each, with their size and modified time. It reads no .pak file for this. When one of them differs from the last build, it reads all file lists again, so a mod that Workbench downloads shows with no restart, also when its folder came before its .pak file. A damaged .pak file is skipped, and the answer names it.
 
 `pak.rs` reads the FILE table and the content of one file. It is translated from `src/pak/reader.ts` and `src/pak/vfs.ts` of enfusion-mcp, with three changes:
 

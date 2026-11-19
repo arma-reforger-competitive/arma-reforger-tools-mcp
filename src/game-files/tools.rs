@@ -9,7 +9,7 @@ use rmcp::model::{CallToolResult, ContentBlock, Tool};
 use tokio_util::sync::CancellationToken;
 
 use super::find::{FindInput, find};
-use super::index::{Index, build, mod_folders};
+use super::index::{Index, ModsOnDisk, build};
 use super::read::{ReadInput, read};
 use super::settings::Settings;
 use super::{Error, Result};
@@ -97,14 +97,14 @@ struct Files {
 
 impl Files {
     /// The index of every Game file. The first call builds it outside the server thread. Each
-    /// later call builds it again when the mod folders on disk are not the ones it was built
-    /// from, so a mod that Workbench downloads shows with no restart. A failed build is not kept,
-    /// so the next call tries again.
+    /// later call builds it again when the mod folders or their .pak files on disk are not the
+    /// ones it was built from, so a mod that Workbench downloads shows with no restart. A failed
+    /// build is not kept, so the next call tries again.
     async fn index(&self, cancel: CancellationToken) -> Result<Arc<Index>> {
         let settings = self.settings.clone();
         let cached = self.cached();
         let index = tokio::task::spawn_blocking(move || match cached {
-            Some(index) if index.mod_folders == mod_folders(&settings).folders => Ok(index),
+            Some(index) if index.mods == ModsOnDisk::list(&settings) => Ok(index),
             _ => build(&settings, &cancel).map(Arc::new),
         });
         let index = match index.await {

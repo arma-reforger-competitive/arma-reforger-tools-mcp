@@ -8,8 +8,8 @@ use crate::workbench_documents::{DOCUMENTS_SETTING, workbench_documents};
 /// The game folder, the folder that holds `ArmaReforger.exe` and `addons`.
 pub(super) const GAME_SETTING: &str = "REFORGER_GAME_PATH";
 
-/// The Workbench profile folder. Its `addons` folder holds the Workshop mods that Workbench
-/// downloaded.
+/// A second folder of Workshop mods, for example `D:\DownloadedMods`. game-files reads the mods in
+/// its `addons` folder and in the `addons` folder of the Workbench folder in Documents.
 pub(super) const PROFILE_SETTING: &str = "REFORGER_WORKBENCH_PROFILE_PATH";
 
 /// The raw values of the settings, as the user wrote them. An empty value counts as not set.

@@ -4,6 +4,7 @@ use std::collections::HashSet;
 use std::fs::{self, File};
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
+use std::time::SystemTime;
 
 use tokio_util::sync::CancellationToken;
 
@@ -12,6 +13,7 @@ use super::settings::{PROFILE_SETTING, Settings};
 use super::{Error, Result};
 use crate::host_path::host_path;
 use crate::mod_folder::ModFolder;
+use crate::workbench_documents::DOCUMENTS_SETTING;
 
 /// The name of the first source: the game itself.
 const GAME: &str = "game";
@@ -26,9 +28,58 @@ pub(super) struct Index {
     /// Each line says what the search did not cover and how to fix it.
     pub(super) notes: Vec<String>,
 
-    /// The mod folders that the index was built from. When the folders on disk differ, the index
-    /// is old.
-    pub(super) mod_folders: Vec<PathBuf>,
+    /// The mods that the index was built from. When the mods on disk differ, the index is old.
+    pub(super) mods: ModsOnDisk,
+}
+
+/// The mod folders in both `addons` folders, each with its .pak files. Two lists are equal when
+/// no folder and no .pak file came, went, or changed its size or its modified time.
+#[derive(PartialEq, Eq)]
+pub(super) struct ModsOnDisk(Vec<ModOnDisk>);
+
+#[derive(PartialEq, Eq)]
+struct ModOnDisk {
+    folder: PathBuf,
+    paks: Vec<PakStamp>,
+}
+
+/// A .pak file as the file system gives it, with no read of its content.
+#[derive(PartialEq, Eq)]
+struct PakStamp {
+    path: PathBuf,
+    len: u64,
+    modified: Option<SystemTime>,
+}
+
+impl ModsOnDisk {
+    /// Lists the mod folders and their .pak files. It reads no .pak file.
+    pub(super) fn list(settings: &Settings) -> Self {
+        Self::of(mod_folders(settings).folders)
+    }
+
+    fn of(folders: Vec<PathBuf>) -> Self {
+        Self(
+            folders
+                .into_iter()
+                .map(|folder| {
+                    let mut paks = Vec::new();
+                    collect_paks(&folder, 1, &mut paks);
+                    let paks = paks
+                        .into_iter()
+                        .map(|path| {
+                            let meta = fs::metadata(&path).ok();
+                            PakStamp {
+                                len: meta.as_ref().map_or(0, fs::Metadata::len),
+                                modified: meta.and_then(|meta| meta.modified().ok()),
+                                path,
+                            }
+                        })
+                        .collect();
+                    ModOnDisk { folder, paks }
+                })
+                .collect(),
+        )
+    }
 }
 
 /// One file in a .pak archive.
@@ -69,35 +120,35 @@ pub(super) fn build(settings: &Settings, cancel: &CancellationToken) -> Result<I
         files: Vec::new(),
         sources: vec![GAME.to_owned()],
         notes: Vec::new(),
-        mod_folders: Vec::new(),
+        mods: ModsOnDisk(Vec::new()),
     };
     index.add(0, &game_paks, cancel)?;
     let ModFolders { folders, notes } = mod_folders(settings);
     index.notes.extend(notes);
-    for folder in &folders {
-        let mut paks = Vec::new();
-        collect_paks(folder, 1, &mut paks);
+    let mods = ModsOnDisk::of(folders);
+    for ModOnDisk { folder, paks } in &mods.0 {
         if paks.is_empty() {
             continue;
         }
+        let paks: Vec<PathBuf> = paks.iter().map(|pak| pak.path.clone()).collect();
         index.sources.push(mod_name(folder));
         index.add(index.sources.len() - 1, &paks, cancel)?;
     }
-    index.mod_folders = folders;
+    index.mods = mods;
     Ok(index)
 }
 
 /// The mod folders in both `addons` folders, with notes about a folder that was not searched.
-pub(super) struct ModFolders {
+struct ModFolders {
     /// Sorted by folder name. A mod ID that is in both `addons` folders is here once, from the
     /// Documents folder.
-    pub(super) folders: Vec<PathBuf>,
+    folders: Vec<PathBuf>,
     notes: Vec<String>,
 }
 
 /// Lists the mod folders in `<Documents folder>/addons` and in `<profile>/addons`. A folder that
 /// is missing becomes a note.
-pub(super) fn mod_folders(settings: &Settings) -> ModFolders {
+fn mod_folders(settings: &Settings) -> ModFolders {
     let mut notes = Vec::new();
     let mut folders = Vec::new();
     if let Some(documents) = &settings.documents {
@@ -106,9 +157,12 @@ pub(super) fn mod_folders(settings: &Settings) -> ModFolders {
     let has_documents = settings.documents.is_some();
     match settings.profile.as_deref() {
         None if !has_documents => notes.push(format!(
-            "{PROFILE_SETTING} is not set, so the search covered the game only. To also search the \
-             Workshop mods that Workbench downloaded, set it to the Workbench profile folder, for \
-             example \"C:\\Users\\<you>\\Documents\\My Games\\ArmaReforgerWorkbench\"."
+            "{DOCUMENTS_SETTING} is not set and the Tool found no Workbench folder in Documents, \
+             so the search covered the game only. To also search the Workshop mods that Workbench \
+             downloaded, set {DOCUMENTS_SETTING} to the Workbench folder in Documents, for example \
+             \"C:\\Users\\<you>\\Documents\\My Games\\ArmaReforgerWorkbench\". To also search \
+             another folder of Workshop mods, for example \"D:\\DownloadedMods\", set \
+             {PROFILE_SETTING} to it."
         )),
         None => {}
         Some(raw_profile) => {
@@ -128,8 +182,8 @@ pub(super) fn mod_folders(settings: &Settings) -> ModFolders {
                 };
                 notes.push(format!(
                     "{PROFILE_SETTING} is \"{raw_profile}\", but {} is not a folder, so \
-                     {covered}. Set it to the Workbench profile folder, the folder that holds \
-                     addons.",
+                     {covered}. Set it to a folder of Workshop mods that holds addons, for \
+                     example \"D:\\DownloadedMods\".",
                     mods_folder.display()
                 ));
             }
