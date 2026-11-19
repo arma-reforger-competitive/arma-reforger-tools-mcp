@@ -1,0 +1,12 @@
+id: port-origin-comment
+language: rust
+severity: error
+message: A comment names the old enfusion-mcp code
+note: |
+  A comment says what the code does now. docs/build-log.md records which old file each part
+  came from, and LICENSE holds the MIT notice of enfusion-mcp (ADR 0001).
+rule:
+  any:
+    - kind: line_comment
+    - kind: block_comment
+  regex: (?i)enfusion-mcp|translated from|old typescript|\.ts`
