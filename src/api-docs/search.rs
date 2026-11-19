@@ -632,7 +632,7 @@ mod tests {
     #[tokio::test]
     async fn gives_the_names_that_are_spelled_almost_the_same_when_no_name_matches() {
         // -- Setup & Fixtures
-        // The typos of the old TypeScript tests.
+        // Names with one missing letter.
         let cases = [
             ("ScriptCompnent", "ScriptComponent", "class"),
             ("GetPositon", "GetPosition", "method"),

@@ -1,10 +1,9 @@
 //! Reads the list of files in a .pak archive of the game or of a mod, and the content of one file.
 //!
 //! A .pak file is a FORM PAC1 container of chunks: HEAD, DATA with the file contents, and FILE
-//! with a tree of folder and file entries. Translated from `src/pak/reader.ts` and
-//! `src/pak/vfs.ts` of enfusion-mcp. Changed: the `offset` of a file is a position from the start
-//! of the .pak file, not from the DATA chunk; a compressed file is zlib with a header, not raw
-//! deflate; and every size, offset, and count is checked against the file length or a limit.
+//! with a tree of folder and file entries. The `offset` of a file is a position from the start of
+//! the .pak file. A compressed file is zlib with a header. Every size, offset, and count is
+//! checked against the file length or a limit.
 
 use std::io::{Read, Seek, SeekFrom};
 

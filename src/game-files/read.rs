@@ -1,9 +1,8 @@
 //! The `game_read` Tool: opens one Game file by its path, with the closest real paths for a
 //! wrong path.
 //!
-//! Translated from `src/tools/game-read.ts` of enfusion-mcp. Changed: capital letters in the path
-//! do not matter, a wrong path gives the closest real paths, a file in a downloaded mod opens
-//! too, and a binary file is found by its content, not by a list of extensions.
+//! Capital letters in the path do not matter, a file in a downloaded mod opens too, and a binary
+//! file is found by its content.
 
 use std::fmt::Write as _;
 use std::path::Path;

@@ -1,0 +1,9 @@
+id: port-origin-comment
+valid:
+  - "//! Reads the list of files in a .pak archive.\nfn read() {}"
+  - "// Names with one missing letter.\nfn read() {}"
+  - 'fn read() { let tool = "enfusion-mcp"; }'
+invalid:
+  - "//! Translated from `src/pak/reader.ts` of enfusion-mcp.\nfn read() {}"
+  - "// The typos of the old TypeScript tests.\nfn read() {}"
+  - "/* Port of `src/tools/game-read.ts`. */\nfn read() {}"

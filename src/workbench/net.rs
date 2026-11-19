@@ -1,5 +1,4 @@
-//! One NET API call over TCP: a new connection, one request, one answer. Translated from
-//! `rawCall` in `src/workbench/client.ts` of enfusion-mcp.
+//! One NET API call over TCP: a new connection, one request, one answer.
 
 use std::time::Duration;
 
