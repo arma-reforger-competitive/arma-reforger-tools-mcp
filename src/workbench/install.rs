@@ -88,6 +88,12 @@ mod tests {
                 "the Handler script does not register the field \"{field}\""
             );
         }
+        for state in ["searching", "downloading", "complete", "failed", "unknown"] {
+            assert!(
+                HANDLER_SCRIPT.contains(&format!("\"{state}\"")),
+                "the Handler script never answers the state \"{state}\""
+            );
+        }
     }
 
     #[test]

@@ -1,7 +1,7 @@
 //! A fake Workbench NET API on 127.0.0.1, for the tests of every Capability that calls Workbench
 //! through the bridge.
 
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 use std::fs;
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
@@ -98,10 +98,14 @@ impl Reply {
 
 /// The fake Workshop: the mods that the fake Workbench can download into `addons`. A download
 /// stays at its percent until the test calls `finish`. A download at 100 percent ends when it
-/// starts.
+/// starts. Like the Handler script, it starts a download again only when it is complete, and it
+/// knows only the downloads that started since `forget`.
 pub struct Workshop {
     addons: PathBuf,
     mods: Mutex<BTreeMap<String, WorkshopMod>>,
+
+    /// The IDs that the Workshop does not have, and that the Handler script was asked to start.
+    started_unknown: Mutex<BTreeSet<String>>,
 }
 
 struct WorkshopMod {
@@ -110,6 +114,9 @@ struct WorkshopMod {
     license: String,
     percent: u8,
     starts: usize,
+
+    /// The Handler script has a download of it in its memory.
+    known: bool,
     complete: bool,
 }
 
@@ -119,6 +126,7 @@ impl Workshop {
         Arc::new(Self {
             addons,
             mods: Mutex::new(BTreeMap::new()),
+            started_unknown: Mutex::new(BTreeSet::new()),
         })
     }
 
@@ -133,6 +141,7 @@ impl Workshop {
                 license: license.to_owned(),
                 percent,
                 starts: 0,
+                known: false,
                 complete: false,
             },
         );
@@ -142,6 +151,16 @@ impl Workshop {
     pub fn finish(&self, id: &str) {
         let mut mods = self.mods.lock().unwrap();
         self.complete(id, mods.get_mut(id).unwrap());
+    }
+
+    /// Workbench loads the scripts again: the Handler script forgets every download. The folders
+    /// stay on disk.
+    pub fn forget(&self) {
+        for workshop_mod in self.mods.lock().unwrap().values_mut() {
+            workshop_mod.known = false;
+            workshop_mod.complete = false;
+        }
+        self.started_unknown.lock().unwrap().clear();
     }
 
     /// How many times the Handler script was asked to start a download of `id`.
@@ -154,22 +173,33 @@ impl Workshop {
     fn answer(&self, action: &str, id: &str) -> Value {
         let mut mods = self.mods.lock().unwrap();
         let Some(workshop_mod) = mods.get_mut(id) else {
+            let mut started = self.started_unknown.lock().unwrap();
             return match action {
-                "reference_download" => json!({}),
-                _ => json!({
+                "reference_download" => {
+                    started.insert(id.to_owned());
+                    json!({})
+                }
+                _ if started.contains(id) => json!({
                     "state": "failed",
                     "reason": "the Workshop has no mod with this ID"
                 }),
+                _ => json!({ "state": "unknown" }),
             };
         };
         match action {
             "reference_download" => {
                 workshop_mod.starts += 1;
-                if workshop_mod.starts == 1 && workshop_mod.percent == 100 {
+                if workshop_mod.known && !workshop_mod.complete {
+                    return json!({});
+                }
+                workshop_mod.known = true;
+                workshop_mod.complete = false;
+                if workshop_mod.percent == 100 {
                     self.complete(id, workshop_mod);
                 }
                 json!({})
             }
+            _ if !workshop_mod.known => json!({ "state": "unknown" }),
             _ if workshop_mod.complete => json!({
                 "state": "complete",
                 "name": workshop_mod.name,

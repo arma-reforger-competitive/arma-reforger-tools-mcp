@@ -262,10 +262,10 @@ class ReforgerBridgeDownloads
 	static void Progress(string id, ReforgerBridgeResponse response)
 	{
 		ReforgerBridgeDownload download = s_Downloads.Get(Key(id));
+		// "unknown": Workbench started no download of this ID since it loaded the scripts.
 		if (!download)
 		{
-			response.state = "failed";
-			response.reason = "Workbench started no download of this ID since it loaded the scripts";
+			response.state = "unknown";
 			return;
 		}
 		download.Answer(response);

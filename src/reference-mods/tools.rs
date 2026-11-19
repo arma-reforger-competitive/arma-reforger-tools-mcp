@@ -7,7 +7,7 @@ use rmcp::model::{CallToolResult, ContentBlock, Tool, ToolAnnotations};
 use serde_json::Map;
 use tokio_util::sync::CancellationToken;
 
-use super::sync::{Settings, Started, Wait, sync};
+use super::sync::{Settings, Wait, sync};
 use crate::workbench::Bridge;
 
 /// Gives the reference-mods Tool to the server, with the settings from the environment.
@@ -22,7 +22,7 @@ fn router_with<S: Send + Sync + 'static>(
     bridge: Bridge,
     wait: Wait,
 ) -> ToolRouter<S> {
-    let state = Arc::new((settings, bridge, wait, Started::default()));
+    let state = Arc::new((settings, bridge, wait));
     let reference_sync = Tool::new(
         "reference_sync",
         "Make the Workshop mods in the Workbench addons folder match the Reference mods: the \
@@ -42,8 +42,8 @@ fn router_with<S: Send + Sync + 'static>(
     ToolRouter::new().with_route((reference_sync, move |cancel: CancellationToken| {
         let state = Arc::clone(&state);
         async move {
-            let (settings, bridge, wait, started) = state.as_ref();
-            match sync(settings, bridge, wait, started, cancel).await {
+            let (settings, bridge, wait) = state.as_ref();
+            match sync(settings, bridge, wait, cancel).await {
                 Ok(text) => CallToolResult::success(vec![ContentBlock::text(text)]),
                 Err(error) => CallToolResult::error(vec![ContentBlock::text(error.to_string())]),
             }

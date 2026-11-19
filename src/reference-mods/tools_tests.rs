@@ -246,6 +246,7 @@ async fn reports_a_running_download_then_records_it_on_the_next_call_without_a_s
 
     // -- Exec
     let first = test_support::call(&client, "reference_sync", json!({})).await;
+    let record_after_first = setup.record_text();
     workshop.finish(MISSING);
     let second = test_support::call(&client, "reference_sync", json!({})).await;
 
@@ -255,6 +256,7 @@ async fn reports_a_running_download_then_records_it_on_the_next_call_without_a_s
         first.text,
         format!("S3C_CameraFix ({MISSING}), license unknown: downloading 40%")
     );
+    assert_eq!(record_after_first, started_line(MISSING, "S3C_CameraFix"));
     assert!(!second.is_error, "{}", second.text);
     assert_eq!(
         second.text,
@@ -264,7 +266,7 @@ async fn reports_a_running_download_then_records_it_on_the_next_call_without_a_s
     assert_eq!(
         setup.record_text(),
         format!(
-            "{{\"id\":\"{MISSING}\",\"folder\":\"S3C_CameraFix_{MISSING}\",\"version\":\"1.0.2\",\"license\":\"APL-SA\"}}\n"
+            "{{\"state\":\"downloaded\",\"id\":\"{MISSING}\",\"folder\":\"S3C_CameraFix_{MISSING}\",\"version\":\"1.0.2\",\"license\":\"APL-SA\"}}\n"
         )
     );
 }
@@ -300,6 +302,177 @@ async fn gives_an_id_that_the_workshop_does_not_know_a_failed_line_and_downloads
              ID\nS3C_CameraFix ({MISSING}), license APL-SA: downloaded"
         )
     );
+}
+
+#[tokio::test]
+async fn records_a_download_that_outlives_the_server_and_deletes_it_when_its_line_goes() {
+    // -- Setup & Fixtures
+    let setup = Setup::new();
+    let list_line = format!(r#"{{"id":"{MISSING}","name":"S3C_CameraFix"}}"#);
+    setup.list("TvtMission", &list_line);
+    let workshop = Workshop::new(setup.addons());
+    workshop.add(MISSING, "S3C_CameraFix", "1.0.2", "APL-SA", 40);
+    let port = fake_workbench(
+        Reply::workbench(Some(env!("CARGO_PKG_VERSION")), Reload::Loads)
+            .with_workshop(Arc::clone(&workshop)),
+    )
+    .await;
+
+    // -- Exec
+    let first = setup.call_on_new_server(port).await;
+    workshop.finish(MISSING);
+    let after_restart = setup.call_on_new_server(port).await;
+    setup.list("TvtMission", "");
+    let after_line_goes = setup.call_on_new_server(port).await;
+
+    // -- Check
+    assert_eq!(
+        first.text,
+        format!("S3C_CameraFix ({MISSING}), license unknown: downloading 40%")
+    );
+    assert_eq!(
+        after_restart.text,
+        format!("S3C_CameraFix ({MISSING}), license APL-SA: downloaded")
+    );
+    assert_eq!(workshop.starts(MISSING), 1);
+    assert_eq!(
+        after_line_goes.text,
+        format!("S3C_CameraFix ({MISSING}), license APL-SA: deleted")
+    );
+    assert!(
+        !setup
+            .addons()
+            .join(format!("S3C_CameraFix_{MISSING}"))
+            .exists()
+    );
+    assert_eq!(setup.record_text(), "");
+}
+
+#[tokio::test]
+async fn records_a_started_download_that_workbench_forgot_when_its_folder_is_on_disk() {
+    // -- Setup & Fixtures
+    let setup = Setup::new();
+    setup.list(
+        "TvtMission",
+        &format!(r#"{{"id":"{MISSING}","name":"S3C_CameraFix"}}"#),
+    );
+    let workshop = Workshop::new(setup.addons());
+    workshop.add(MISSING, "S3C_CameraFix", "1.0.2", "APL-SA", 40);
+    let port = fake_workbench(
+        Reply::workbench(Some(env!("CARGO_PKG_VERSION")), Reload::Loads)
+            .with_workshop(Arc::clone(&workshop)),
+    )
+    .await;
+    setup.call_on_new_server(port).await;
+    workshop.finish(MISSING);
+    workshop.forget();
+
+    // -- Exec
+    let answer = setup.call_on_new_server(port).await;
+
+    // -- Check
+    assert_eq!(
+        answer.text,
+        format!("S3C_CameraFix ({MISSING}), license unknown: downloaded")
+    );
+    assert_eq!(workshop.starts(MISSING), 1);
+    assert_eq!(
+        setup.record_text(),
+        format!(
+            "{{\"state\":\"downloaded\",\"id\":\"{MISSING}\",\"folder\":\"S3C_CameraFix_{MISSING}\",\"version\":\"unknown\",\"license\":\"unknown\"}}\n"
+        )
+    );
+}
+
+#[tokio::test]
+async fn starts_a_started_download_again_when_workbench_forgot_it_and_no_folder_is_on_disk() {
+    // -- Setup & Fixtures
+    let setup = Setup::new();
+    setup.list(
+        "TvtMission",
+        &format!(r#"{{"id":"{MISSING}","name":"S3C_CameraFix"}}"#),
+    );
+    let workshop = Workshop::new(setup.addons());
+    workshop.add(MISSING, "S3C_CameraFix", "1.0.2", "APL-SA", 40);
+    let port = fake_workbench(
+        Reply::workbench(Some(env!("CARGO_PKG_VERSION")), Reload::Loads)
+            .with_workshop(Arc::clone(&workshop)),
+    )
+    .await;
+    setup.call_on_new_server(port).await;
+    workshop.forget();
+
+    // -- Exec
+    let answer = setup.call_on_new_server(port).await;
+
+    // -- Check
+    assert_eq!(
+        answer.text,
+        format!("S3C_CameraFix ({MISSING}), license unknown: downloading 40%")
+    );
+    assert_eq!(workshop.starts(MISSING), 2);
+    assert_eq!(setup.record_text(), started_line(MISSING, "S3C_CameraFix"));
+}
+
+#[tokio::test]
+async fn fails_a_complete_download_with_no_folder_and_does_not_record_it() {
+    // -- Setup & Fixtures
+    let setup = Setup::new();
+    setup.list(
+        "TvtMission",
+        &format!(r#"{{"id":"{MISSING}","name":"S3C_CameraFix"}}"#),
+    );
+    let workshop = Workshop::new(setup.addons());
+    workshop.add(MISSING, "S3C_CameraFix", "1.0.2", "APL-SA", 40);
+    let port = fake_workbench(
+        Reply::workbench(Some(env!("CARGO_PKG_VERSION")), Reload::Loads)
+            .with_workshop(Arc::clone(&workshop)),
+    )
+    .await;
+    setup.call_on_new_server(port).await;
+    workshop.finish(MISSING);
+    fs::remove_dir_all(setup.addons().join(format!("S3C_CameraFix_{MISSING}"))).unwrap();
+
+    // -- Exec
+    let answer = setup.call_on_new_server(port).await;
+
+    // -- Check
+    assert_eq!(
+        answer.text,
+        format!(
+            "S3C_CameraFix ({MISSING}), license unknown: failed: Workbench says that the \
+             download is complete, but addons has no folder <Name>_{MISSING}"
+        )
+    );
+    assert_eq!(setup.record_text(), "");
+}
+
+#[tokio::test]
+async fn never_records_or_deletes_a_listed_mod_that_the_user_downloaded_by_hand() {
+    // -- Setup & Fixtures
+    let setup = Setup::new();
+    setup.list(
+        "TvtMission",
+        &format!(r#"{{"id":"{BY_HAND}","name":"handMod"}}"#),
+    );
+    setup.mod_folder(&format!("ByHand_{BY_HAND}"));
+    let listed = setup.sync().await;
+    setup.list("TvtMission", "");
+
+    // -- Exec
+    let unlisted = setup.sync().await;
+
+    // -- Check
+    assert_eq!(
+        listed.text,
+        format!("handMod ({BY_HAND}), license unknown: present")
+    );
+    assert_eq!(
+        unlisted.text,
+        "No list has a Reference mod, and the record has no mod to delete."
+    );
+    assert!(setup.addons().join(format!("ByHand_{BY_HAND}")).is_dir());
+    assert!(!setup.addons().join(".reference-mods.jsonl").exists());
 }
 
 // -- Test Support
@@ -372,6 +545,13 @@ impl Setup {
         test_support::call(&client, "reference_sync", json!({})).await
     }
 
+    /// Calls `reference_sync` once on a new server, as after a restart, which calls the fake
+    /// Workbench on `port`.
+    async fn call_on_new_server(&self, port: u16) -> Answer {
+        let client = self.client(port).await;
+        test_support::call(&client, "reference_sync", json!({})).await
+    }
+
     /// A client of one server, which calls the fake Workbench on `port`.
     async fn client(&self, port: u16) -> test_support::TestClient {
         let settings = Settings {
@@ -391,8 +571,14 @@ fn short_wait() -> Wait {
     }
 }
 
+fn started_line(id: &str, name: &str) -> String {
+    format!("{{\"state\":\"started\",\"id\":\"{id}\",\"name\":\"{name}\"}}\n")
+}
+
 fn record_line(id: &str, folder: &str, license: &str) -> String {
-    format!(r#"{{"id":"{id}","folder":"{folder}","version":"1.0.0","license":"{license}"}}"#)
+    format!(
+        r#"{{"state":"downloaded","id":"{id}","folder":"{folder}","version":"1.0.0","license":"{license}"}}"#
+    )
 }
 
 #[cfg(unix)]

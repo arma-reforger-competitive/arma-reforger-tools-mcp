@@ -3,11 +3,10 @@
 //! the record. The decisions are in
 //! `plan.rs`.
 
-use std::collections::{BTreeMap, BTreeSet};
+use std::collections::BTreeMap;
 use std::fs;
 use std::io::ErrorKind;
 use std::path::{Path, PathBuf};
-use std::sync::{Mutex, MutexGuard, PoisonError};
 use std::time::Duration;
 
 use serde_json::{Map, Value};
@@ -16,8 +15,9 @@ use tokio_util::sync::CancellationToken;
 
 use super::error::BadLine;
 use super::plan::{
-    Line, Listed, ModId, Planned, Progress, Recorded, State, answer, folder_of, parse_line,
-    parse_progress, parse_record, plan, record_text, recorded_name, unknown_license,
+    Action, Delete, Line, Listed, ModId, Planned, Progress, Recorded, State, answer, folder_of,
+    parse_line, parse_progress, parse_record, plan, record_text, remove_started, set,
+    unknown_license,
 };
 use super::{Error, Result};
 use crate::host_path::host_path;
@@ -70,102 +70,110 @@ impl Wait {
     }
 }
 
-/// The downloads that this server started and that have not ended. A later call asks for their
-/// progress and starts none of them again.
-pub(super) type Started = Mutex<BTreeSet<ModId>>;
-
 /// Makes the `addons` folder match the lists, and returns the text of the answer.
 pub(super) async fn sync(
     settings: &Settings,
     bridge: &Bridge,
     wait: &Wait,
-    started: &Started,
     cancel: CancellationToken,
 ) -> Result<String> {
     let mods = settings.mods.clone();
     let documents = settings.documents.clone();
     let clean_cancel = cancel.clone();
-    let cleaned =
-        blocking(move || clean(mods.as_deref(), documents.as_deref(), &clean_cancel)).await?;
+    let Cleaned {
+        reference,
+        deleted,
+        addons,
+        mut record,
+    } = blocking(move || clean(mods.as_deref(), documents.as_deref(), &clean_cancel)).await?;
 
+    // The state of each Reference mod that is final before the wait.
     let mut states: Vec<Option<State>> = Vec::new();
-    let mut waiting = Vec::new();
-    for (index, planned) in cleaned.reference.iter().enumerate() {
+    let mut known: BTreeMap<usize, Known> = BTreeMap::new();
+    let mut started_any = false;
+    for (index, planned) in reference.iter().enumerate() {
         let id = &planned.listed.id;
-        let state = if is_started(started, id) {
-            waiting.push(index);
-            None
-        } else if planned.present.is_some() {
-            Some(State::Present)
-        } else {
-            match bridge.call("reference_download", id_param(id)).await {
-                Ok(_) => {
-                    lock(started).insert(id.clone());
-                    waiting.push(index);
-                    None
+        let start = match &planned.action {
+            Action::Present { .. } => false,
+            Action::Download => true,
+            Action::Follow { folder } => match progress(bridge, id).await {
+                Known::Answer(Progress::Unknown) if folder.is_some() => {
+                    // Workbench lost the download, for example after a restart, but its folder
+                    // is on disk.
+                    known.insert(
+                        index,
+                        Known::Answer(Progress::Complete {
+                            version: unknown_license(),
+                            license: unknown_license(),
+                        }),
+                    );
+                    false
                 }
-                Err(error) => Some(State::Failed {
-                    reason: error.to_string(),
-                }),
+                Known::Answer(Progress::Unknown) => true,
+                now => {
+                    known.insert(index, now);
+                    false
+                }
+            },
+        };
+        let state = match &planned.action {
+            Action::Present { .. } => Some(State::Present),
+            Action::Download | Action::Follow { .. } if !start => None,
+            Action::Download | Action::Follow { .. } => {
+                match bridge.call("reference_download", id_param(id)).await {
+                    Ok(_) => {
+                        set(
+                            &mut record,
+                            Recorded::Started {
+                                id: id.to_string(),
+                                name: planned.listed.name.clone(),
+                            },
+                        );
+                        started_any = true;
+                        known.insert(index, Known::Answer(Progress::Running { percent: 0 }));
+                        None
+                    }
+                    Err(error) => Some(State::Failed {
+                        reason: error.to_string(),
+                    }),
+                }
             }
         };
         states.push(state);
     }
+    if started_any {
+        let file = addons.join(RECORD_FILE);
+        let kept = record.clone();
+        blocking(move || write_record(&file, &kept)).await?;
+    }
 
-    let progress = wait_for(bridge, wait, &cleaned.reference, &waiting).await;
-    let complete: Vec<(ModId, String, String)> = progress
-        .iter()
-        .filter_map(|(index, progress)| match progress {
-            Progress::Complete { version, license } => Some((
-                cleaned.reference.get(*index)?.listed.id.clone(),
-                version.clone(),
-                license.clone(),
-            )),
-            Progress::Running { .. } | Progress::Failed { .. } => None,
-        })
+    wait_for(bridge, wait, &reference, &mut known).await;
+    let ids: BTreeMap<usize, ModId> = known
+        .keys()
+        .filter_map(|&index| Some((index, reference.get(index)?.listed.id.clone())))
         .collect();
-    let addons = cleaned.addons.clone();
-    let mut record = cleaned.record;
-    let recorded =
-        blocking(move || add_to_record(&addons, &mut record, &complete, &cancel)).await?;
+    let mut settled = blocking(move || settle(&addons, record, &ids, known, &cancel)).await?;
 
     let mut lines = Vec::new();
-    for (index, planned) in cleaned.reference.iter().enumerate() {
-        let id = &planned.listed.id;
-        let mut license = planned.present.clone().unwrap_or_else(unknown_license);
-        let state = match (
+    for (index, planned) in reference.iter().enumerate() {
+        let (license, state) = match (
             states.get_mut(index).and_then(Option::take),
-            progress.get(&index),
+            &planned.action,
         ) {
-            (Some(state), _) => state,
-            (None, Some(Progress::Running { percent })) => State::Downloading { percent: *percent },
-            (None, Some(Progress::Failed { reason })) => {
-                lock(started).remove(id);
-                State::Failed {
-                    reason: reason.clone(),
-                }
-            }
-            (None, Some(Progress::Complete { license: got, .. })) => {
-                lock(started).remove(id);
-                if recorded.contains(id) {
-                    license.clone_from(got);
-                    State::Downloaded
-                } else {
+            (Some(state), Action::Present { license }) => (license.clone(), state),
+            (Some(state), _) => (unknown_license(), state),
+            (None, _) => settled.remove(&index).unwrap_or_else(|| {
+                (
+                    unknown_license(),
                     State::Failed {
-                        reason: format!(
-                            "Workbench says that the download is complete, but addons has no \
-                             folder <Name>_{id}"
-                        ),
-                    }
-                }
-            }
-            (None, None) => State::Failed {
-                reason: "the Tool got no progress of the download".to_owned(),
-            },
+                        reason: "the Tool got no progress of the download".to_owned(),
+                    },
+                )
+            }),
         };
         lines.push(line(&planned.listed, license, state));
     }
-    lines.extend(cleaned.deleted);
+    lines.extend(deleted);
     Ok(answer(&lines))
 }
 
@@ -208,18 +216,20 @@ fn clean(
     let plan = plan(&lists, &record, &folders);
 
     let mut deleted = Vec::new();
-    for entry in &plan.delete {
+    for Delete { entry, folder } in &plan.delete {
         if cancel.is_cancelled() {
             break;
         }
-        let state = delete(&addons.join(&entry.folder));
+        let state = folder
+            .as_ref()
+            .map_or(State::Deleted, |folder| delete(&addons.join(folder)));
         if matches!(state, State::Deleted) {
             record.retain(|kept| kept != entry);
         }
         deleted.push(Line {
-            name: recorded_name(entry).to_owned(),
-            id: entry.id.to_ascii_uppercase(),
-            license: entry.license.clone(),
+            name: entry.name().to_owned(),
+            id: entry.id().to_ascii_uppercase(),
+            license: entry.license().to_owned(),
             state,
         });
     }
@@ -240,83 +250,123 @@ fn clean(
     })
 }
 
-/// Asks for the progress of the downloads of the Reference mods at `waiting` about every
-/// `wait.poll`, until each one is complete or failed, or until `wait.total` ends. Returns the
-/// last progress of each.
+/// What the call knows about one download.
+enum Known {
+    /// The answer of the Handler script.
+    Answer(Progress),
+
+    /// Workbench gave no answer. The reason is the message of the bridge.
+    NoAnswer { reason: String },
+}
+
+/// Asks Workbench for the progress of the download of `id`.
+async fn progress(bridge: &Bridge, id: &ModId) -> Known {
+    match bridge.call("reference_progress", id_param(id)).await {
+        Ok((answer, _)) => Known::Answer(parse_progress(&answer)),
+        Err(error) => Known::NoAnswer {
+            reason: error.to_string(),
+        },
+    }
+}
+
+/// Asks for the progress of each running download in `known` about every `wait.poll`, until each
+/// one ends, or until `wait.total` ends. Keeps the last progress of each in `known`.
 async fn wait_for(
     bridge: &Bridge,
     wait: &Wait,
     reference: &[Planned],
-    waiting: &[usize],
-) -> BTreeMap<usize, Progress> {
+    known: &mut BTreeMap<usize, Known>,
+) {
     let deadline = Instant::now() + wait.total;
-    let mut progress = BTreeMap::new();
     loop {
-        for &index in waiting {
-            if matches!(
-                progress.get(&index),
-                Some(Progress::Complete { .. } | Progress::Failed { .. })
-            ) {
+        for (&index, now) in known.iter_mut() {
+            if !matches!(now, Known::Answer(Progress::Running { .. })) {
                 continue;
             }
             let Some(planned) = reference.get(index) else {
                 continue;
             };
-            let now = match bridge
-                .call("reference_progress", id_param(&planned.listed.id))
-                .await
-            {
-                Ok((answer, _)) => parse_progress(&answer),
-                Err(error) => Progress::Failed {
-                    reason: error.to_string(),
-                },
-            };
-            progress.insert(index, now);
+            *now = progress(bridge, &planned.listed.id).await;
         }
-        let running = progress
+        let running = known
             .values()
-            .any(|now| matches!(now, Progress::Running { .. }));
+            .any(|now| matches!(now, Known::Answer(Progress::Running { .. })));
         if !running || Instant::now() + wait.poll > deadline {
-            return progress;
+            return;
         }
         tokio::time::sleep(wait.poll).await;
     }
 }
 
-/// Adds each complete download whose folder is in `addons` to the record, and writes the record
-/// when it changed. Returns the IDs that it added.
-fn add_to_record(
+/// Puts the end of each download in `known` into `record`, and writes the record when it changed.
+/// A complete download whose folder is in `addons` becomes a downloaded line. A complete download
+/// with no folder and a failed download lose their started line. A running download, and one that
+/// Workbench did not answer for, keep it. Returns the license name and the state of each.
+fn settle(
     addons: &Path,
-    record: &mut Vec<Recorded>,
-    complete: &[(ModId, String, String)],
+    mut record: Vec<Recorded>,
+    ids: &BTreeMap<usize, ModId>,
+    known: BTreeMap<usize, Known>,
     cancel: &CancellationToken,
-) -> Result<BTreeSet<ModId>> {
-    if complete.is_empty() {
-        return Ok(BTreeSet::new());
-    }
+) -> Result<BTreeMap<usize, (String, State)>> {
+    let before = record.clone();
     let folders = folder_names(addons)?;
-    let mut added = BTreeSet::new();
-    for (id, version, license) in complete {
+    let mut settled = BTreeMap::new();
+    for (index, now) in known {
         if cancel.is_cancelled() {
-            return Err(Error::Cancelled);
+            break;
         }
-        let Some(folder) = folder_of(id, &folders) else {
+        let Some(id) = ids.get(&index) else {
             continue;
         };
-        let raw = id.to_string();
-        record.retain(|entry| !entry.id.eq_ignore_ascii_case(&raw));
-        record.push(Recorded {
-            id: raw,
-            folder: folder.clone(),
-            version: version.clone(),
-            license: license.clone(),
-        });
-        added.insert(id.clone());
+        let end = match now {
+            Known::Answer(Progress::Running { percent }) => {
+                (unknown_license(), State::Downloading { percent })
+            }
+            Known::Answer(Progress::Complete { version, license }) => {
+                if let Some(folder) = folder_of(id, &folders) {
+                    set(
+                        &mut record,
+                        Recorded::Downloaded {
+                            id: id.to_string(),
+                            folder: folder.clone(),
+                            version,
+                            license: license.clone(),
+                        },
+                    );
+                    (license, State::Downloaded)
+                } else {
+                    remove_started(&mut record, id);
+                    let reason = format!(
+                        "Workbench says that the download is complete, but addons has no folder \
+                         <Name>_{id}"
+                    );
+                    (unknown_license(), State::Failed { reason })
+                }
+            }
+            Known::Answer(Progress::Failed { reason }) => {
+                remove_started(&mut record, id);
+                (unknown_license(), State::Failed { reason })
+            }
+            Known::Answer(Progress::Unknown) => (
+                unknown_license(),
+                State::Failed {
+                    reason: "Workbench no longer knows this download, for example because it \
+                             loaded the scripts again. Call again."
+                        .to_owned(),
+                },
+            ),
+            Known::NoAnswer { reason } => (unknown_license(), State::Failed { reason }),
+        };
+        settled.insert(index, end);
     }
-    if !added.is_empty() {
-        write_record(&addons.join(RECORD_FILE), record)?;
+    if record != before {
+        write_record(&addons.join(RECORD_FILE), &record)?;
     }
-    Ok(added)
+    if cancel.is_cancelled() {
+        return Err(Error::Cancelled);
+    }
+    Ok(settled)
 }
 
 /// Runs the file work `work` away from the thread of the server.
@@ -333,16 +383,6 @@ fn id_param(id: &ModId) -> Map<String, Value> {
     let mut params = Map::new();
     params.insert("id".to_owned(), Value::from(id.to_string()));
     params
-}
-
-fn is_started(started: &Started, id: &ModId) -> bool {
-    lock(started).contains(id)
-}
-
-/// The set of started downloads. Each change to it is one insert or one remove, so a lock that
-/// a panic poisoned still holds a whole set.
-fn lock(started: &Started) -> MutexGuard<'_, BTreeSet<ModId>> {
-    started.lock().unwrap_or_else(PoisonError::into_inner)
 }
 
 /// The Reference mods of the lists in each direct subfolder of `mods`, in folder order. It checks
@@ -483,7 +523,7 @@ mod tests {
         let addons = documents.path().join("addons");
         let folder = addons.join("OldMod_5965770215E93269");
         fs::create_dir_all(&folder).unwrap();
-        let record = "{\"id\":\"5965770215E93269\",\"folder\":\"OldMod_5965770215E93269\",\
+        let record = "{\"state\":\"downloaded\",\"id\":\"5965770215E93269\",\"folder\":\"OldMod_5965770215E93269\",\
                       \"version\":\"1.0.0\",\"license\":\"MIT\"}\n";
         fs::write(addons.join(RECORD_FILE), record).unwrap();
         let cancel = CancellationToken::new();

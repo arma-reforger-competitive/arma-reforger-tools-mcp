@@ -43,14 +43,48 @@ pub(super) struct Listed {
     pub(super) name: String,
 }
 
-/// One line of the record: a mod that the Tool downloaded.
+/// One line of the record: a mod that the Tool asked Workbench to download. The record has at
+/// most one line for each ID.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(deny_unknown_fields)]
-pub(super) struct Recorded {
-    pub(super) id: String,
-    pub(super) folder: String,
-    pub(super) version: String,
-    pub(super) license: String,
+#[serde(tag = "state", rename_all = "lowercase", deny_unknown_fields)]
+pub(super) enum Recorded {
+    /// Workbench accepted the start, and the Tool has not seen the download end.
+    Started { id: String, name: String },
+
+    /// The download is complete, and its folder `<Name>_<ID>` was on disk.
+    Downloaded {
+        id: String,
+        folder: String,
+        version: String,
+        license: String,
+    },
+}
+
+impl Recorded {
+    pub(super) fn id(&self) -> &str {
+        match self {
+            Self::Started { id, .. } | Self::Downloaded { id, .. } => id,
+        }
+    }
+
+    /// The mod name: the name in the list for a started download, the name in the folder
+    /// `<Name>_<ID>` for a downloaded mod.
+    pub(super) fn name(&self) -> &str {
+        match self {
+            Self::Started { name, .. } => name,
+            Self::Downloaded { folder, .. } => {
+                ModFolder::parse(folder).map_or(folder.as_str(), |parts| parts.name)
+            }
+        }
+    }
+
+    /// The license name, or "unknown" for a started download.
+    pub(super) fn license(&self) -> &str {
+        match self {
+            Self::Started { .. } => UNKNOWN_LICENSE,
+            Self::Downloaded { license, .. } => license,
+        }
+    }
 }
 
 /// What one call does.
@@ -60,17 +94,39 @@ pub(super) struct Plan {
     pub(super) reference: Vec<Planned>,
 
     /// The mods in the record that no list has.
-    pub(super) delete: Vec<Recorded>,
+    pub(super) delete: Vec<Delete>,
 }
 
 /// A Reference mod and what the call does with it.
 #[derive(Debug, PartialEq, Eq)]
 pub(super) struct Planned {
     pub(super) listed: Listed,
+    pub(super) action: Action,
+}
 
-    /// `None`: the mod is not on disk, so the call downloads it. `Some`: it is on disk, with the
-    /// license name from the record, or "unknown".
-    pub(super) present: Option<String>,
+/// What the call does with a Reference mod.
+#[derive(Debug, PartialEq, Eq)]
+pub(super) enum Action {
+    /// It is on disk and has no started download. The license name comes from the record, or is
+    /// "unknown" when the record has no line for it (the user downloaded it by hand).
+    Present { license: String },
+
+    /// It is not on disk and has no started download: start one.
+    Download,
+
+    /// The record has a started download: ask Workbench for its progress. `folder`: its folder
+    /// `<Name>_<ID>` on disk, if one is there.
+    Follow { folder: Option<String> },
+}
+
+/// A mod in the record that no list has.
+#[derive(Debug, PartialEq, Eq)]
+pub(super) struct Delete {
+    pub(super) entry: Recorded,
+
+    /// The folder to delete. `None`: a started download has no folder on disk, so the call only
+    /// removes its line.
+    pub(super) folder: Option<String>,
 }
 
 /// One line of the answer.
@@ -105,6 +161,9 @@ pub(super) enum Progress {
     Failed {
         reason: String,
     },
+
+    /// Workbench started no download of this ID since it loaded the scripts.
+    Unknown,
 }
 
 /// The fields of a list line, before the check of their values.
@@ -130,9 +189,10 @@ pub(super) fn parse_line(line: &str) -> Result<Option<Listed>, BadLine> {
     Ok(Some(Listed { id, name: raw.name }))
 }
 
-/// The mods in the record text. A record line is valid when it has the four fields, an ID of 16
-/// hex digits, and a folder `<Name>_<ID>` with no path in it. `Err`: the number and the reason of
-/// the first line that is not valid.
+/// The mods in the record text. A record line is valid when it has the fields of its state and an
+/// ID of 16 hex digits. A started line has a name that is not empty. A downloaded line has a folder
+/// `<Name>_<ID>` with no path in it. `Err`: the number and the reason of the first line that is not
+/// valid.
 pub(super) fn parse_record(text: &str) -> Result<Vec<Recorded>, (usize, BadLine)> {
     let mut record = Vec::new();
     for (index, line) in text.lines().enumerate() {
@@ -148,7 +208,7 @@ pub(super) fn parse_record(text: &str) -> Result<Vec<Recorded>, (usize, BadLine)
 /// The text of the record file.
 pub(super) fn record_text(record: &[Recorded]) -> String {
     record.iter().fold(String::new(), |mut text, entry| {
-        // A struct of four strings always serializes.
+        // An enum of strings always serializes.
         if let Ok(line) = serde_json::to_string(entry) {
             text.push_str(&line);
             text.push('\n');
@@ -167,22 +227,33 @@ pub(super) fn plan(lists: &[Listed], record: &[Recorded], folders: &[String]) ->
         {
             continue;
         }
-        let present = folders
-            .iter()
-            .any(|folder| listed.id.names(folder))
-            .then(|| {
-                recorded(record, &listed.id)
-                    .map_or_else(|| UNKNOWN_LICENSE.to_owned(), |entry| entry.license.clone())
-            });
+        let folder = folder_of(&listed.id, folders);
+        let action = match (recorded(record, &listed.id), folder) {
+            (Some(Recorded::Started { .. }), folder) => Action::Follow {
+                folder: folder.cloned(),
+            },
+            (entry, Some(_)) => Action::Present {
+                license: entry.map_or(UNKNOWN_LICENSE, Recorded::license).to_owned(),
+            },
+            (_, None) => Action::Download,
+        };
         reference.push(Planned {
             listed: listed.clone(),
-            present,
+            action,
         });
     }
     let delete = record
         .iter()
-        .filter(|entry| !lists.iter().any(|listed| same_id(&listed.id, &entry.id)))
-        .cloned()
+        .filter(|entry| !lists.iter().any(|listed| same_id(&listed.id, entry.id())))
+        .map(|entry| Delete {
+            entry: entry.clone(),
+            folder: match entry {
+                Recorded::Started { .. } => {
+                    ModId::parse(entry.id()).and_then(|id| folder_of(&id, folders).cloned())
+                }
+                Recorded::Downloaded { folder, .. } => Some(folder.clone()),
+            },
+        })
         .collect();
     Plan { reference, delete }
 }
@@ -239,6 +310,7 @@ pub(super) fn parse_progress(answer: &Map<String, Value>) -> Progress {
             version: text("mod_version"),
             license: text("license"),
         },
+        Some("unknown") => Progress::Unknown,
         Some("failed") => Progress::Failed {
             reason: answer
                 .get("reason")
@@ -260,14 +332,20 @@ pub(super) fn folder_of<'a>(id: &ModId, folders: &'a [String]) -> Option<&'a Str
     folders.iter().find(|folder| id.names(folder))
 }
 
-/// The name of a recorded mod: the name in its folder `<Name>_<ID>`.
-pub(super) fn recorded_name(entry: &Recorded) -> &str {
-    ModFolder::parse(&entry.folder).map_or(&entry.folder, |parts| parts.name)
-}
-
 /// The license name of a mod that is not in the record.
 pub(super) fn unknown_license() -> String {
     UNKNOWN_LICENSE.to_owned()
+}
+
+/// Puts `entry` into `record` in place of the line of its ID.
+pub(super) fn set(record: &mut Vec<Recorded>, entry: Recorded) {
+    record.retain(|kept| !kept.id().eq_ignore_ascii_case(entry.id()));
+    record.push(entry);
+}
+
+/// Removes the started line of `id`. A downloaded line stays.
+pub(super) fn remove_started(record: &mut Vec<Recorded>, id: &ModId) {
+    record.retain(|kept| !(matches!(kept, Recorded::Started { .. }) && same_id(id, kept.id())));
 }
 
 // region:    --- Support
@@ -276,20 +354,24 @@ fn parse_record_line(line: &str) -> Result<Recorded, BadLine> {
     let entry: Recorded = serde_json::from_str(line).map_err(|err| BadLine::NotJson {
         detail: err.to_string(),
     })?;
-    let id = ModId::parse(&entry.id).ok_or_else(|| BadLine::BadId {
-        id: entry.id.clone(),
+    let id = ModId::parse(entry.id()).ok_or_else(|| BadLine::BadId {
+        id: entry.id().to_owned(),
     })?;
-    let plain = !entry.folder.contains(['/', '\\']) && !entry.folder.starts_with('.');
-    if !(plain && id.names(&entry.folder)) {
-        return Err(BadLine::BadFolder {
-            folder: entry.folder,
-        });
+    match &entry {
+        Recorded::Started { name, .. } if name.trim().is_empty() => Err(BadLine::EmptyName),
+        Recorded::Downloaded { folder, .. }
+            if folder.contains(['/', '\\']) || folder.starts_with('.') || !id.names(folder) =>
+        {
+            Err(BadLine::BadFolder {
+                folder: folder.clone(),
+            })
+        }
+        Recorded::Started { .. } | Recorded::Downloaded { .. } => Ok(entry),
     }
-    Ok(entry)
 }
 
 fn recorded<'a>(record: &'a [Recorded], id: &ModId) -> Option<&'a Recorded> {
-    record.iter().find(|entry| same_id(id, &entry.id))
+    record.iter().find(|entry| same_id(id, entry.id()))
 }
 
 fn same_id(id: &ModId, raw: &str) -> bool {
@@ -305,30 +387,44 @@ mod tests {
     use super::*;
 
     #[test]
-    fn plans_delete_download_and_present() {
+    fn plans_delete_download_present_and_follow() {
         // -- Setup & Fixtures
         let listed = |id: &str, name: &str| Listed {
             id: ModId::parse(id).unwrap(),
             name: name.to_owned(),
         };
-        let recorded = |id: &str, folder: &str| Recorded {
+        let downloaded = |id: &str, folder: &str| Recorded::Downloaded {
             id: id.to_owned(),
             folder: folder.to_owned(),
             version: "1.0.0".to_owned(),
             license: "MIT".to_owned(),
         };
+        let started = |id: &str, name: &str| Recorded::Started {
+            id: id.to_owned(),
+            name: name.to_owned(),
+        };
         let lists = [
             listed("6AA81EE549F50CB7", "tvtLobby"),
             listed("6a09759015ffda26", "S3C_CameraFix"),
             listed("6AA81EE549F50CB7", "tvtLobby again"),
+            listed("591AF5BDA9F7CE8B", "ByHand"),
+            listed("1111111111111111", "Running"),
+            listed("2222222222222222", "DoneAfterRestart"),
         ];
         let record = [
-            recorded("6AA81EE549F50CB7", "tvtLobby_6AA81EE549F50CB7"),
-            recorded("5965770215E93269", "OldMod_5965770215E93269"),
+            downloaded("6AA81EE549F50CB7", "tvtLobby_6AA81EE549F50CB7"),
+            downloaded("5965770215E93269", "OldMod_5965770215E93269"),
+            started("1111111111111111", "Running"),
+            started("2222222222222222", "DoneAfterRestart"),
+            started("3333333333333333", "StartedOnDisk"),
+            started("4444444444444444", "StartedNotOnDisk"),
         ];
         let folders = [
             "tvtLobby_6aa81ee549f50cb7".to_owned(),
             "_6A09759015FFDA26".to_owned(),
+            "ByHand_591AF5BDA9F7CE8B".to_owned(),
+            "DoneAfterRestart_2222222222222222".to_owned(),
+            "StartedOnDisk_3333333333333333".to_owned(),
             "saves".to_owned(),
         ];
 
@@ -336,29 +432,90 @@ mod tests {
         let plan = plan(&lists, &record, &folders);
 
         // -- Check
+        let planned = |listed, action| Planned { listed, action };
         assert_eq!(
             plan,
             Plan {
                 reference: vec![
-                    Planned {
-                        listed: listed("6AA81EE549F50CB7", "tvtLobby"),
-                        present: Some("MIT".to_owned()),
+                    planned(
+                        listed("6AA81EE549F50CB7", "tvtLobby"),
+                        Action::Present {
+                            license: "MIT".to_owned()
+                        }
+                    ),
+                    planned(
+                        listed("6A09759015FFDA26", "S3C_CameraFix"),
+                        Action::Download
+                    ),
+                    planned(
+                        listed("591AF5BDA9F7CE8B", "ByHand"),
+                        Action::Present {
+                            license: "unknown".to_owned()
+                        }
+                    ),
+                    planned(
+                        listed("1111111111111111", "Running"),
+                        Action::Follow { folder: None }
+                    ),
+                    planned(
+                        listed("2222222222222222", "DoneAfterRestart"),
+                        Action::Follow {
+                            folder: Some("DoneAfterRestart_2222222222222222".to_owned())
+                        }
+                    ),
+                ],
+                delete: vec![
+                    Delete {
+                        entry: downloaded("5965770215E93269", "OldMod_5965770215E93269"),
+                        folder: Some("OldMod_5965770215E93269".to_owned()),
                     },
-                    Planned {
-                        listed: listed("6A09759015FFDA26", "S3C_CameraFix"),
-                        present: None,
+                    Delete {
+                        entry: started("3333333333333333", "StartedOnDisk"),
+                        folder: Some("StartedOnDisk_3333333333333333".to_owned()),
+                    },
+                    Delete {
+                        entry: started("4444444444444444", "StartedNotOnDisk"),
+                        folder: None,
                     },
                 ],
-                delete: vec![recorded("5965770215E93269", "OldMod_5965770215E93269")],
             }
         );
+    }
+
+    #[test]
+    fn reads_back_the_record_that_it_writes() {
+        // -- Setup & Fixtures
+        let record = vec![
+            Recorded::Started {
+                id: "6A09759015FFDA26".to_owned(),
+                name: "S3C_CameraFix".to_owned(),
+            },
+            Recorded::Downloaded {
+                id: "6AA81EE549F50CB7".to_owned(),
+                folder: "tvtLobby_6AA81EE549F50CB7".to_owned(),
+                version: "1.0.0".to_owned(),
+                license: "MIT".to_owned(),
+            },
+        ];
+
+        // -- Exec
+        let text = record_text(&record);
+
+        // -- Check
+        assert_eq!(
+            text,
+            "{\"state\":\"started\",\"id\":\"6A09759015FFDA26\",\"name\":\"S3C_CameraFix\"}\n\
+             {\"state\":\"downloaded\",\"id\":\"6AA81EE549F50CB7\",\
+             \"folder\":\"tvtLobby_6AA81EE549F50CB7\",\"version\":\"1.0.0\",\"license\":\"MIT\"}\n"
+        );
+        assert_eq!(parse_record(&text).unwrap(), record);
     }
 
     #[test]
     fn refuses_a_record_folder_with_a_path_in_it() {
         // -- Exec
         let result = parse_record(
-            r#"{"id":"5965770215E93269","folder":"../x_5965770215E93269","version":"1","license":"MIT"}"#,
+            r#"{"state":"downloaded","id":"5965770215E93269","folder":"../x_5965770215E93269","version":"1","license":"MIT"}"#,
         );
 
         // -- Check
