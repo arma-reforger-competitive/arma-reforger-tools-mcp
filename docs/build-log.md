@@ -88,3 +88,9 @@
 - The wait ends at 30 seconds, progress questions included. `reference_sync` checks a cancel in its file work.
 - `game-files` builds its file list again also when a `.pak` file in a mod folder changes, so a mod whose `.pak` came after its folder shows with no restart. Its notes name the right setting.
 - One parse of the folder name `<Name>_<ID>` in `src/mod_folder.rs` for both Capabilities. ADR 0004 now lets `workbench` make `Bridge` public.
+
+## workbench_launch checks that Steam runs (#77)
+
+- The real Workbench check of #77 found the bug: Steam was closed, but `ActiveUser` in the registry still named the user. `workbench_launch` did not start Steam, and Workbench closed with `SteamAPI_Init failed. Is Steam running?`.
+- Now a user counts as logged in only when `steam.exe` runs (`tasklist.exe`) and `ActiveUser` is not 0. The check reads only the CSV row of `steam.exe`, because `tasklist.exe` writes its "no match" message in the language of Windows.
+- After the fix, the Tool started Steam and then Workbench. The four checks of #77 passed with `S3C_CameraFix`: downloaded, present, found by `game_find`, and deleted after its line went.
