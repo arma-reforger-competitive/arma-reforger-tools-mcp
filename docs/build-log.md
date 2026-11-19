@@ -81,3 +81,10 @@
 - The Handler script got the actions `reference_download` and `reference_progress`, with the steps that #19 proved: `RequestPage` with `"search": "<ID>"`, keep the item with that exact ID, `AskDetail`, then `Download` of `GetLatestRevision()`. The license name comes from `License()`.
 - The state of each download stays in Workbench memory between calls. A second start of the same ID starts nothing, unless its last try failed. One search runs at a time, because the Workshop keeps only the items of the last page.
 - The Handler version and the version in `Cargo.toml` went up to 0.2.0. A test checks that the script has both actions and every field that `reference_sync` reads. The compile and the real download need the real Workbench.
+
+## reference_sync review fixes (#72)
+
+- The record keeps a `started` line for each download that Workbench accepted, so a download that outlives the server is recorded and later deleted. The record is the only state. The Handler script answers `unknown` for a download that it does not know, and it starts a complete or failed download again. The search keeps only the item with the exact ID.
+- The wait ends at 30 seconds, progress questions included. `reference_sync` checks a cancel in its file work.
+- `game-files` builds its file list again also when a `.pak` file in a mod folder changes, so a mod whose `.pak` came after its folder shows with no restart. Its notes name the right setting.
+- One parse of the folder name `<Name>_<ID>` in `src/mod_folder.rs` for both Capabilities. ADR 0004 now lets `workbench` make `Bridge` public.
