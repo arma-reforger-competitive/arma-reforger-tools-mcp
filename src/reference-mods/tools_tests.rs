@@ -508,6 +508,35 @@ async fn stops_a_progress_question_at_the_end_of_the_wait() {
     assert_eq!(setup.record_text(), started_line(MISSING, "S3C_CameraFix"));
 }
 
+#[tokio::test]
+async fn labels_reference_sync_as_destructive_and_gives_the_license_rule() {
+    // -- Setup & Fixtures
+    let setup = Setup::new();
+    let client = setup.client(free_port().await).await;
+
+    // -- Exec
+    let tools = client.list_all_tools().await.unwrap();
+
+    // -- Check
+    let tool = tools
+        .iter()
+        .find(|tool| tool.name == "reference_sync")
+        .unwrap();
+    let labels = tool.annotations.clone().unwrap();
+    assert_eq!(labels.read_only_hint, Some(false));
+    assert_eq!(labels.destructive_hint, Some(true));
+    assert_eq!(labels.idempotent_hint, Some(true));
+    assert_eq!(labels.open_world_hint, Some(true));
+    let description = tool.description.as_deref().unwrap_or_default();
+    assert!(
+        description.contains(
+            "read any Reference mod; copy code only when its license allows it; otherwise \
+             write the feature again in your own way."
+        ),
+        "{description}"
+    );
+}
+
 // -- Test Support
 
 /// A temp folder of mod repos and a temp Workbench folder in Documents.
