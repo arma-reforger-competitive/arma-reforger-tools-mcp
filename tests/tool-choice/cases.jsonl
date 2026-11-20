@@ -15,3 +15,5 @@
 {"question":"Can you fire up the Reforger modding editor for me?","tools":["workbench_launch","workbench_status"]}
 {"question":"I removed a mod from my reference list. Clean up the downloaded reference mods so they match my lists again.","tools":["reference_sync"]}
 {"question":"Get the Workshop mods that my mod repos say I should study onto this computer.","tools":["reference_sync"]}
+{"question":"I am making a new mod by hand. What ID do I put in the GUID field of my .gproj file?","tools":["guid_generate"]}
+{"question":"I am setting up a Reforger addon from scratch, and its project file wants a unique identifier. Can you come up with one for me?","tools":["guid_generate"]}

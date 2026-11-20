@@ -1003,6 +1003,7 @@ name = "reforger"
 version = "0.2.0"
 dependencies = [
  "flate2",
+ "getrandom",
  "proptest",
  "rmcp",
  "schemars",

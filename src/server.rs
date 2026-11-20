@@ -14,7 +14,7 @@ use rmcp::{
     transport::stdio,
 };
 
-use crate::{answer_size, api_docs, game_files, reference_mods, wiki, workbench};
+use crate::{answer_size, api_docs, game_files, guid, reference_mods, wiki, workbench};
 
 /// The Server guide: Claude Code reads it once when a session starts. It names every Tool in
 /// backticks, and a test in `tests/server.rs` checks that each name is a served Tool.
@@ -41,6 +41,8 @@ ready. When Workbench runs already, it starts nothing and names the open mod.
 user's mod repos list for study. It downloads the missing ones and deletes the dropped ones. It \
 finds and reads the lists itself, and they are not in the project folder, so call it directly, \
 with no input, and do not look for the lists first.
+- `guid_generate`: make a new GUID for the .gproj file of a new mod. It takes no input. Do not \
+make up a GUID or write a script for one.
 
 A class name, a method signature, or a game file path from memory is often wrong. These Tools \
 give the real one.";
@@ -96,7 +98,8 @@ pub async fn run() -> Result<(), Box<dyn std::error::Error>> {
             + api_docs::tools()?
             + game_files::tools()
             + workbench::tools()
-            + reference_mods::tools(),
+            + reference_mods::tools()
+            + guid::tools(),
     );
     server.serve(stdio()).await?.waiting().await?;
     Ok(())

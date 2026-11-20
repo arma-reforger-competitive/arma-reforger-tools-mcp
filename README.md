@@ -33,6 +33,7 @@ claude plugin install reforger@reforger-local
 | `game_find`        | Finds the scripts, Prefabs, and configs inside the `.pak` files of the game and of downloaded Workshop mods.   |
 | `workbench_status` | Checks the connection to a running Workbench, copies the Handler script into the open mod, and names that mod. |
 | `workbench_launch` | Starts Workbench with one of your mods open, finds it through Steam, and waits until the scripts are compiled. |
+| `guid_generate`    | Makes a new random GUID for the `.gproj` file of a new mod: 16 hex characters in upper case.                   |
 
 `game_find` and the Workbench tools need settings. Their READMEs list them: [`src/game-files/README.md`](src/game-files/README.md) and [`src/workbench/README.md`](src/workbench/README.md).
 
