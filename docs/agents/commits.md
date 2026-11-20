@@ -26,7 +26,7 @@ The plugin follows [Semantic Versioning 2.0.0](https://semver.org/spec/v2.0.0.ht
 
 The scope is the name of the place the change lives in:
 
-- a Capability folder: `api-docs`, `wiki`, `game-files`, `workbench`
+- a Capability folder: `api-docs`, `wiki`, `game-files`, `workbench`, `guid`
 - a skill: `create-mod`, `port-status`
 - `plugin` for the plugin manifest and server start-up
 

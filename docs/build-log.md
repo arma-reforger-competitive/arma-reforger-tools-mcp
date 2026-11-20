@@ -94,3 +94,13 @@
 - The real Workbench check of #77 found the bug: Steam was closed, but `ActiveUser` in the registry still named the user. `workbench_launch` did not start Steam, and Workbench closed with `SteamAPI_Init failed. Is Steam running?`.
 - Now a user counts as logged in only when `steam.exe` runs (`tasklist.exe`) and `ActiveUser` is not 0. The check reads only the CSV row of `steam.exe`, because `tasklist.exe` writes its "no match" message in the language of Windows.
 - After the fix, the Tool started Steam and then Workbench. The four checks of #77 passed with `S3C_CameraFix`: downloaded, present, found by `game_find`, and deleted after its line went.
+
+## One input schema for Tools with no inputs
+
+- The input schema of a Tool with no inputs is now one function, `server::no_inputs()`, for `workbench` and `reference-mods`. Before, each Capability had its own copy.
+
+## guid_generate (#39)
+
+- New Capability `guid` with the Tool `guid_generate`. It is not a Port: the old project had only a helper of 1 line in `src/formats/guid.ts`, and the Port ledger has no row for it.
+- It takes no inputs and returns one GUID: 8 random bytes of the operating system (`getrandom`) as 16 hex characters in upper case. A mod's GUID is also its Workshop ID, so it must be unique.
+- It uses `server::no_inputs()` for its input schema, like `workbench` and `reference-mods`.

@@ -7,6 +7,7 @@ mod answer_size;
 mod api_docs;
 #[path = "game-files/mod.rs"]
 mod game_files;
+mod guid;
 mod host_path;
 mod mod_folder;
 #[path = "reference-mods/mod.rs"]

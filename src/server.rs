@@ -1,18 +1,20 @@
 //! The MCP server: one Tool router with the Tools of every Capability.
 
+use std::sync::Arc;
+
 use rmcp::{
     ErrorData, RoleServer, ServerHandler, ServiceExt,
     handler::server::{router::tool::ToolRouter, tool::ToolCallContext},
     model::{
-        CallToolRequestParams, CallToolResponse, Implementation, ServerCapabilities, ServerConfig,
-        ToolAnnotations,
+        CallToolRequestParams, CallToolResponse, Implementation, JsonObject, ServerCapabilities,
+        ServerConfig, ToolAnnotations,
     },
     service::RequestContext,
     tool_handler,
     transport::stdio,
 };
 
-use crate::{answer_size, api_docs, game_files, reference_mods, wiki, workbench};
+use crate::{answer_size, api_docs, game_files, guid, reference_mods, wiki, workbench};
 
 /// The Server guide: Claude Code reads it once when a session starts. It names every Tool in
 /// backticks, and a test in `tests/server.rs` checks that each name is a served Tool.
@@ -39,6 +41,8 @@ ready. When Workbench runs already, it starts nothing and names the open mod.
 user's mod repos list for study. It downloads the missing ones and deletes the dropped ones. It \
 finds and reads the lists itself, and they are not in the project folder, so call it directly, \
 with no input, and do not look for the lists first.
+- `guid_generate`: make a new GUID for the .gproj file of a new mod. It takes no input. Do not \
+make up a GUID or write a script for one.
 
 A class name, a method signature, or a game file path from memory is often wrong. These Tools \
 give the real one.";
@@ -94,10 +98,19 @@ pub async fn run() -> Result<(), Box<dyn std::error::Error>> {
             + api_docs::tools()?
             + game_files::tools()
             + workbench::tools()
-            + reference_mods::tools(),
+            + reference_mods::tools()
+            + guid::tools(),
     );
     server.serve(stdio()).await?.waiting().await?;
     Ok(())
+}
+
+/// The input schema of a Tool with no inputs. MCP needs `"type": "object"`, and a client drops a
+/// Tool whose schema does not have it.
+pub fn no_inputs() -> Arc<JsonObject> {
+    let mut schema = JsonObject::new();
+    schema.insert("type".to_owned(), "object".into());
+    Arc::new(schema)
 }
 
 /// The Tool labels of a Tool that only reads files on this computer: it changes nothing, a second
@@ -126,7 +139,7 @@ fn cut_answer(response: CallToolResponse) -> CallToolResponse {
 
 #[cfg(test)]
 mod tests {
-    use std::{sync::Arc, time::Duration};
+    use std::time::Duration;
 
     use rmcp::model::{CallToolRequest, CallToolResult, ClientRequest, Tool};
     use rmcp::service::PeerRequestOptions;
