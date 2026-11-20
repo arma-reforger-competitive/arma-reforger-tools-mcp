@@ -1,11 +1,13 @@
 //! The MCP server: one Tool router with the Tools of every Capability.
 
+use std::sync::Arc;
+
 use rmcp::{
     ErrorData, RoleServer, ServerHandler, ServiceExt,
     handler::server::{router::tool::ToolRouter, tool::ToolCallContext},
     model::{
-        CallToolRequestParams, CallToolResponse, Implementation, ServerCapabilities, ServerConfig,
-        ToolAnnotations,
+        CallToolRequestParams, CallToolResponse, Implementation, JsonObject, ServerCapabilities,
+        ServerConfig, ToolAnnotations,
     },
     service::RequestContext,
     tool_handler,
@@ -100,6 +102,14 @@ pub async fn run() -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 
+/// The input schema of a Tool with no inputs. MCP needs `"type": "object"`, and a client drops a
+/// Tool whose schema does not have it.
+pub fn no_inputs() -> Arc<JsonObject> {
+    let mut schema = JsonObject::new();
+    schema.insert("type".to_owned(), "object".into());
+    Arc::new(schema)
+}
+
 /// The Tool labels of a Tool that only reads files on this computer: it changes nothing, a second
 /// call gives the same answer, and it does not use the internet.
 pub fn read_only_labels() -> ToolAnnotations {
@@ -126,7 +136,7 @@ fn cut_answer(response: CallToolResponse) -> CallToolResponse {
 
 #[cfg(test)]
 mod tests {
-    use std::{sync::Arc, time::Duration};
+    use std::time::Duration;
 
     use rmcp::model::{CallToolRequest, CallToolResult, ClientRequest, Tool};
     use rmcp::service::PeerRequestOptions;

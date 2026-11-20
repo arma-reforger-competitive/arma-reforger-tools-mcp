@@ -4,10 +4,10 @@ use std::sync::Arc;
 
 use rmcp::handler::server::router::tool::ToolRouter;
 use rmcp::model::{CallToolResult, ContentBlock, Tool, ToolAnnotations};
-use serde_json::Map;
 use tokio_util::sync::CancellationToken;
 
 use super::sync::{Settings, Wait, sync};
+use crate::server::no_inputs;
 use crate::workbench::Bridge;
 
 /// Gives the reference-mods Tool to the server, with the settings from the environment.
@@ -35,7 +35,7 @@ fn router_with<S: Send + Sync + 'static>(
          list line that is not valid stops it before any delete, and the answer names the file \
          and the line. License rule: read any Reference mod; copy code only when its license \
          allows it; otherwise write the feature again in your own way.",
-        Arc::new(no_inputs()),
+        no_inputs(),
     )
     .with_title("Sync the Reference mods")
     .annotate(labels());
@@ -52,13 +52,6 @@ fn router_with<S: Send + Sync + 'static>(
 }
 
 // region:    --- Support
-
-/// The input schema of a Tool with no inputs. MCP needs `"type": "object"`.
-fn no_inputs() -> Map<String, serde_json::Value> {
-    let mut schema = Map::new();
-    schema.insert("type".to_owned(), "object".into());
-    schema
-}
 
 /// It deletes mod folders, a second call has no more effect, and it downloads from the Workshop.
 fn labels() -> ToolAnnotations {

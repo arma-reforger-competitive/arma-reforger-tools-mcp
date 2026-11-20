@@ -16,6 +16,7 @@ use super::install::HANDLER_FOLDER;
 use super::launch::{Launched, launch};
 #[cfg(test)]
 use super::settings::Settings;
+use crate::server::no_inputs;
 
 /// The input of `workbench_launch`.
 #[derive(Deserialize, JsonSchema)]
@@ -51,7 +52,7 @@ fn router_with<S: Send + Sync + 'static>(bridge: Bridge) -> ToolRouter<S> {
          so. It never starts or stops Workbench: to start Workbench or open a mod in it, use \
          workbench_launch. It writes only its own file \
          Scripts/WorkbenchGame/ReforgerBridge/ReforgerBridge.c in the open mod.",
-        Arc::new(no_inputs()),
+        no_inputs(),
     )
     .with_title("Check the Workbench connection")
     .annotate(labels());
@@ -84,14 +85,6 @@ fn router_with<S: Send + Sync + 'static>(bridge: Bridge) -> ToolRouter<S> {
 }
 
 // region:    --- Support
-
-/// The input schema of a Tool with no inputs. MCP needs `"type": "object"`, and a client drops a
-/// Tool whose schema does not have it.
-fn no_inputs() -> Map<String, serde_json::Value> {
-    let mut schema = Map::new();
-    schema.insert("type".to_owned(), "object".into());
-    schema
-}
 
 /// The Tool labels of the Workbench Tools: they copy and overwrite the Handler script, a second
 /// call has no more effect, and they do not use the internet.

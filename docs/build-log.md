@@ -94,3 +94,7 @@
 - The real Workbench check of #77 found the bug: Steam was closed, but `ActiveUser` in the registry still named the user. `workbench_launch` did not start Steam, and Workbench closed with `SteamAPI_Init failed. Is Steam running?`.
 - Now a user counts as logged in only when `steam.exe` runs (`tasklist.exe`) and `ActiveUser` is not 0. The check reads only the CSV row of `steam.exe`, because `tasklist.exe` writes its "no match" message in the language of Windows.
 - After the fix, the Tool started Steam and then Workbench. The four checks of #77 passed with `S3C_CameraFix`: downloaded, present, found by `game_find`, and deleted after its line went.
+
+## One input schema for Tools with no inputs
+
+- The input schema of a Tool with no inputs is now one function, `server::no_inputs()`, for `workbench` and `reference-mods`. Before, each Capability had its own copy.
