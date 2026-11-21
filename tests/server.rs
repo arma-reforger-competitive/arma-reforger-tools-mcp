@@ -127,6 +127,40 @@ async fn names_every_served_tool_and_no_other_in_the_server_guide() {
 }
 
 #[tokio::test]
+async fn has_a_row_for_every_served_tool_in_the_readme_tools_table() {
+    // -- Setup & Fixtures
+    let client = start().await;
+    let readme = include_str!("../README.md");
+    let table = readme
+        .split_once("\n## Tools\n")
+        .expect("README.md has a Tools section")
+        .1
+        .split("\n## ")
+        .next()
+        .unwrap_or_default();
+
+    // -- Exec
+    // A row starts with the Tool name in backticks: "| `wiki_read` | ... |".
+    let rows: Vec<&str> = table
+        .lines()
+        .filter_map(|line| line.strip_prefix("| `")?.split_once('`'))
+        .map(|(name, _)| name)
+        .collect();
+
+    // -- Exec & Check
+    for tool in client.list_all_tools().await.unwrap() {
+        assert!(
+            rows.contains(&tool.name.as_ref()),
+            "the server serves {}, but README.md has no row for it: add its row to the Tools \
+             table in README.md",
+            tool.name
+        );
+    }
+
+    client.cancel().await.unwrap();
+}
+
+#[tokio::test]
 async fn gives_every_tool_a_title_and_all_four_tool_labels() {
     // -- Setup & Fixtures
     let client = start().await;
