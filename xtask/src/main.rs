@@ -10,6 +10,7 @@ mod error;
 mod import;
 mod knowledge;
 mod net_api;
+mod port_status;
 mod tool_choice;
 mod wiki_export;
 mod wikitext;
@@ -38,6 +39,7 @@ fn main() -> ExitCode {
         SubCmd::ToolChoice(args) => tool_choice::run(&args),
         SubCmd::NetApi(args) => net_api::run(&args).map_err(Error::from),
         SubCmd::CallTool(args) => call_tool::run(&args).map_err(Error::from),
+        SubCmd::PortStatus(command) => port_status::run(&command).map_err(Error::from),
     };
     match result {
         Ok(()) => ExitCode::SUCCESS,

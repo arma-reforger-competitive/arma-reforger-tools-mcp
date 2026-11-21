@@ -8,7 +8,7 @@ A Claude Code plugin for Arma Reforger modding: an MCP server for Capabilities, 
 - `src/<capability>/` (`wiki/`, `api-docs/`, `game-files/`, `workbench/`, `reference-mods/`, `guid/`): one Capability each: its Tools, logic, tests, and a `README.md`. Read the folder's `README.md` before you change a Tool (ADR-0004).
 - `src/wiki/pages/` and `src/api-docs/classes.jsonl`: the Knowledge base. `cargo xtask import` writes them from the Workbench docs and `src/wiki/source/export.xml`, which the owner saves from the wiki (ADR-0005). To change them, run the import.
 - `tests/`: tests that start the real program (`server.rs`) or check the Knowledge base files (`knowledge_base.rs`). `tests/tool-choice/cases.jsonl`: the Tool-choice tests.
-- `xtask/`: developer commands: `cargo xtask ci` runs every check, `cargo xtask import` rebuilds the Knowledge base, `cargo xtask tool-choice` runs the Tool-choice tests, `cargo xtask net-api` sends one raw call to the Workbench NET API, `cargo xtask call-tool` calls one Tool of the release build and prints only its answer. `wire.rs` and `wsl.rs` of the server are built into `net-api` too, so they use only `std`. Read it before you change a check or the import.
+- `xtask/`: developer commands: `cargo xtask ci` runs every check, `cargo xtask import` rebuilds the Knowledge base, `cargo xtask tool-choice` runs the Tool-choice tests, `cargo xtask net-api` sends one raw call to the Workbench NET API, `cargo xtask call-tool` calls one Tool of the release build and prints only its answer, `cargo xtask port-status` keeps the Port ledger. `wire.rs` and `wsl.rs` of the server are built into `net-api` too, so they use only `std`. Read it before you change a check or the import.
 - `lint/ast-grep/`: the check that stops a `String` used as an error. Read it when `cargo xtask ci` fails at an `ast-grep` step.
 - `docs/adr/`: the decisions and why. `docs/agents/`: the rules for Rust code, Tools, and commits. `docs/port-ledger.md` and `docs/build-log.md`: what is ported and what changed. `docs/sources/`: read-only research copies.
 - `.claude/skills/`: Developer skills of this repo: `port-status` (the Port ledger) and `workbench-test` (start, call, and close the real Workbench in a test). Read `workbench-test` before you test a change to `src/workbench/` on the real Workbench. `.claude-plugin/`: the plugin manifest.
@@ -26,7 +26,7 @@ A Port is done when all five checks pass:
 2. Each new Tool gives the expected answers when you call it: `cargo xtask call-tool <tool> <name>=<value>`. It passes your `REFORGER_*` settings and prints only the answer. Run `cargo build --release` first.
 3. Each new Tool has at least 2 Tool-choice tests in `tests/tool-choice/cases.jsonl`. `cargo xtask tool-choice --tool <tool>` passes before the PR, and `cargo xtask tool-choice` passes before the merge.
 4. `docs/build-log.md` has a 3-5 line entry: what was ported, what changed from the old code, and why.
-5. The Port's rows in the Port ledger are marked "ported": `node .claude/skills/port-status/port-status.ts set ported <old feature> --tool <new tool>`. The agent sets this itself, in the Port's PR, when checks 1-4 pass and the ticket has no work left.
+5. The Port's rows in the Port ledger are marked "ported": `cargo xtask port-status set ported <old feature> --tool <new tool>`. The agent sets this itself, in the Port's PR, when checks 1-4 pass and the ticket has no work left.
 
 ## Code
 

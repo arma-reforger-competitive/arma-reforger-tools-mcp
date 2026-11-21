@@ -6,11 +6,11 @@ disable-model-invocation: true
 
 The **Port ledger** (`docs/port-ledger.md`) lists every feature of the old project with one status: `ported`, `not needed`, or `not yet`. The owner decides `not needed` and `not yet`. An agent sets `ported` when its Port is done (check 5 in `CLAUDE.md`). A suggestion is only evidence for the owner.
 
-`port-status.ts` in this folder does all reading and writing of the ledger. Change the ledger only through it. `node .claude/skills/port-status/port-status.ts help` shows the commands.
+`cargo xtask port-status` does all reading and writing of the ledger. Change the ledger only through it. `cargo xtask port-status help` shows the commands.
 
 ## Steps
 
-1. **Report.** Run `node .claude/skills/port-status/port-status.ts report`. It adds the features that the ledger does not list yet, writes new suggestions from the session history, and checks that every `ported` row links to a Tool or skill that exists. The step is done when the command ends with a verdict line.
+1. **Report.** Run `cargo xtask port-status report`. It adds the features that the ledger does not list yet, writes new suggestions from the session history, and checks that every `ported` row links to a Tool or skill that exists. The step is done when the command ends with a verdict line.
 
 2. **Show the open rows.** Give the owner, in plain words:
    - the history line, because a short history makes the suggestions weak;
@@ -18,14 +18,14 @@ The **Port ledger** (`docs/port-ledger.md`) lists every feature of the old proje
    - the `not yet` rows, grouped by kind and by suggestion, with the usage numbers. Name groups the owner can decide at once, for example "the 12 `*_create` tools, never used".
 
 3. **Ask for decisions.** For each row or group, the owner picks one:
-   - **port it**: create a ticket (see below), then record it with `set not-yet <selector> --ticket "[#<n>](<url>)"`;
-   - **not needed**: `set not-needed <selector>... --reason "<the owner's reason>"`;
-   - **ported**: `set ported <selector> --tool <tool name>` or `--skill <skill name>`;
+   - **port it**: create a ticket (see below), then record it with `cargo xtask port-status set not-yet <selector> --ticket "[#<n>](<url>)"`;
+   - **not needed**: `cargo xtask port-status set not-needed <selector>... --reason "<the owner's reason>"`;
+   - **ported**: `cargo xtask port-status set ported <selector> --tool <tool name>` or `--skill <skill name>`;
    - **wait**: change nothing.
 
-   One `set` takes many selectors and globs, so a decision for a group is one command. A `not needed` row goes back with `set not-yet <selector>`. Write the owner's reason in their words. The step is done when the owner has answered every row or group you showed, or has said to stop.
+   One `set` takes many selectors and globs, so a decision for a group is one command. A `not needed` row goes back with `cargo xtask port-status set not-yet <selector>`. Write the owner's reason in their words. The step is done when the owner has answered every row or group you showed, or has said to stop.
 
-4. **Verdict.** Run `report` again. Give the owner its last block: "Port done: nothing left in the old repo." or "Not done: N features still open." with the list.
+4. **Verdict.** Run `cargo xtask port-status report` again. Give the owner its last block: "Port done: nothing left in the old repo." or "Not done: N features still open." with the list.
 
 5. **Commit.** The ledger is data: commit the owner's decisions in `docs/port-ledger.md` straight to `main` with `docs(port-status): <what was decided>`. A `ported` row that a Port sets goes in the Port's PR, so it turns true when the PR merges.
 
