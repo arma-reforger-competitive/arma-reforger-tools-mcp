@@ -1,0 +1,8 @@
+GameProject {
+ ID "{{ID}}"
+ GUID "{{GUID}}"
+ TITLE "{{NAME}}"
+ Dependencies {
+  "58D0FB3206B6F859"
+ }
+}

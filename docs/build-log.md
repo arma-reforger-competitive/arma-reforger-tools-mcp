@@ -104,3 +104,10 @@
 - New Capability `guid` with the Tool `guid_generate`. It is not a Port: the old project had only a helper of 1 line in `src/formats/guid.ts`, and the Port ledger has no row for it.
 - It takes no inputs and returns one GUID: 8 random bytes of the operating system (`getrandom`) as 16 hex characters in upper case. A mod's GUID is also its Workshop ID, so it must be unique.
 - It uses `server::no_inputs()` for its input schema, like `workbench` and `reference-mods`.
+
+## create-mod skill (#8)
+
+- New plugin skill `skills/create-mod/` from the old prompt `src/prompts/create-mod.ts` and the template `src/templates/gproj.ts`. The old prompt built a whole mod with Tools that this plugin does not have. The skill does only the start: the `.gproj` file, `.gitignore`, `reference-mods.jsonl`, and the first open with `workbench_launch`.
+- The `.gproj` template is the file that the Workbench launcher writes: `ID`, `GUID`, `TITLE`, and the game as the one dependency. The old template also wrote empty `PC` and `HEADLESS` configurations, which Workbench does not write.
+- The GUID comes only from `guid_generate`. When the server is not connected, the skill stops and says to run `claude mcp list`.
+- A new test in `tests/server.rs` fails when a skill names a Tool that the server does not serve.

@@ -39,6 +39,12 @@ claude plugin install reforger@reforger-local
 
 `game_find`, `game_read`, the Workbench tools, and `reference_sync` need settings. Their READMEs list them: [`src/game-files/README.md`](src/game-files/README.md), [`src/workbench/README.md`](src/workbench/README.md), and [`src/reference-mods/README.md`](src/reference-mods/README.md).
 
+## Skills
+
+| Skill        | What it does                                                                                                                |
+| ------------ | --------------------------------------------------------------------------------------------------------------------------- |
+| `create-mod` | Starts a new mod from an empty folder: the `.gproj` file with a GUID from `guid_generate`, and the first open in Workbench. |
+
 ## Development
 
 ```sh
