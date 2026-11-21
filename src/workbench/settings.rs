@@ -7,8 +7,8 @@ use std::path::PathBuf;
 use std::time::Duration;
 
 use super::{Error, Result};
-use crate::host_path::is_wsl;
 use crate::workbench_documents::{DOCUMENTS_SETTING, workbench_documents};
+use crate::wsl::{is_wsl, windows_host};
 
 /// The computer that runs Workbench.
 pub(super) const HOST_SETTING: &str = "REFORGER_WORKBENCH_HOST";
@@ -122,7 +122,7 @@ impl Settings {
         };
         let host = match self.host.as_deref() {
             Some(host) => host.trim().to_owned(),
-            None if is_wsl() => windows_host()?.to_string(),
+            None if is_wsl() => windows_host().ok_or(Error::NoWindowsHost)?.to_string(),
             None => Ipv4Addr::LOCALHOST.to_string(),
         };
         Ok(Address { host, port })
@@ -153,54 +153,3 @@ impl fmt::Display for Address {
         write!(f, "{}:{}", self.host, self.port)
     }
 }
-
-// region:    --- Support
-
-/// The address of the Windows host as WSL sees it: the gateway of the default route.
-fn windows_host() -> Result<Ipv4Addr> {
-    let table = std::fs::read_to_string("/proc/net/route").map_err(|_| Error::NoWindowsHost)?;
-    default_gateway(&table).ok_or(Error::NoWindowsHost)
-}
-
-/// The gateway of the default route in the text of `/proc/net/route`. Each address there is 8 hex
-/// digits in little-endian order.
-fn default_gateway(table: &str) -> Option<Ipv4Addr> {
-    table.lines().skip(1).find_map(|line| {
-        let mut fields = line.split_whitespace().skip(1);
-        let (destination, gateway) = (fields.next()?, fields.next()?);
-        if destination != "00000000" {
-            return None;
-        }
-        let gateway = u32::from_str_radix(gateway, 16).ok()?;
-        Some(Ipv4Addr::from(gateway.to_le_bytes()))
-    })
-}
-
-// endregion: --- Support
-
-// region:    --- Tests
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn finds_the_windows_host_in_the_route_table_of_wsl() {
-        // -- Setup & Fixtures
-        // The route table of a WSL 2 computer whose Windows host is 172.17.240.1.
-        let table = "Iface\tDestination\tGateway \tFlags\tRefCnt\tUse\tMetric\tMask\t\tMTU\tWindow\tIRTT\n\
-                     eth0\t00F011AC\t00000000\t0001\t0\t0\t0\t00F0FFFF\t0\t0\t0\n\
-                     eth0\t00000000\t01F011AC\t0003\t0\t0\t0\t00000000\t0\t0\t0\n";
-
-        // -- Exec & Check
-        assert_eq!(default_gateway(table), Some(Ipv4Addr::new(172, 17, 240, 1)));
-    }
-
-    #[test]
-    fn finds_no_windows_host_without_a_default_route() {
-        // -- Exec & Check
-        assert_eq!(default_gateway("Iface\tDestination\tGateway\n"), None);
-    }
-}
-
-// endregion: --- Tests

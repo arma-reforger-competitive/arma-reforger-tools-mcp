@@ -6,6 +6,7 @@ use std::path::PathBuf;
 
 use super::settings::{Address, DOWNLOADS_SETTING, HOST_SETTING, PORT_SETTING};
 use super::steam::App;
+use super::wire::BadBytes;
 use crate::workbench_documents::DOCUMENTS_SETTING;
 
 /// Where users report a bug of the plugin.
@@ -152,15 +153,10 @@ pub enum NoStart {
 /// Why an answer is not a NET API answer.
 #[derive(Debug)]
 pub enum Garbled {
-    /// The answer ends in the middle of a string, or is empty.
-    Ends,
-    ExtraBytes {
-        count: usize,
-    },
+    Bytes(BadBytes),
     TooLong {
         max: usize,
     },
-    NotUtf8,
     NotJson {
         payload: String,
     },
@@ -385,10 +381,8 @@ impl fmt::Display for NoStart {
 impl fmt::Display for Garbled {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Self::Ends => write!(f, "it ends in the middle of a string"),
-            Self::ExtraBytes { count } => write!(f, "it has {count} bytes after the payload"),
+            Self::Bytes(bad) => write!(f, "{bad}"),
             Self::TooLong { max } => write!(f, "it is longer than {max} bytes"),
-            Self::NotUtf8 => write!(f, "a string in it is not UTF-8"),
             Self::NotJson { payload } => {
                 let start: String = payload.chars().take(80).collect();
                 write!(f, "its payload is not JSON: \"{start}\"")
@@ -423,6 +417,14 @@ impl std::error::Error for Error {
 impl From<Garbled> for Error {
     fn from(garbled: Garbled) -> Self {
         Self::BadAnswer { garbled }
+    }
+}
+
+impl From<BadBytes> for Error {
+    fn from(bad: BadBytes) -> Self {
+        Self::BadAnswer {
+            garbled: Garbled::Bytes(bad),
+        }
     }
 }
 

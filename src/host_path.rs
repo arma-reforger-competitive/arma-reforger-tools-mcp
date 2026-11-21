@@ -22,13 +22,6 @@ pub fn windows_path(raw: &str) -> String {
     windows_from_wsl(raw).unwrap_or_else(|| raw.to_owned())
 }
 
-/// True when the server runs in WSL.
-pub fn is_wsl() -> bool {
-    cfg!(target_os = "linux")
-        && std::fs::read_to_string("/proc/version")
-            .is_ok_and(|version| version.to_ascii_lowercase().contains("microsoft"))
-}
-
 // region:    --- Support
 
 /// `D:\Games` or `D:/Games` as `/mnt/d/Games`, or `None` when `path` does not start with a drive.
