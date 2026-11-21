@@ -2,3 +2,4 @@ target/
 .idea/
 tests/.out/
 xtask/tests/.out/
+.claude/worktrees/
