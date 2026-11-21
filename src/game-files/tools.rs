@@ -5,7 +5,7 @@ use std::sync::{Arc, Mutex, PoisonError};
 use rmcp::handler::server::{
     common::schema_for_type, router::tool::ToolRouter, wrapper::Parameters,
 };
-use rmcp::model::{CallToolResult, ContentBlock, Tool};
+use rmcp::model::Tool;
 use tokio_util::sync::CancellationToken;
 
 use super::find::{FindInput, find};
@@ -13,7 +13,7 @@ use super::index::{Index, ModsOnDisk, build};
 use super::read::{ReadInput, read};
 use super::settings::Settings;
 use super::{Error, Result};
-use crate::server::read_only_labels;
+use crate::server::{Answer, answer, read_only_labels};
 
 /// Gives the game-files Tools to the server, with the settings from the environment.
 pub fn tools<S: Send + Sync + 'static>() -> ToolRouter<S> {
@@ -57,16 +57,7 @@ pub(super) fn router<S: Send + Sync + 'static>(settings: Settings) -> ToolRouter
             game_read,
             move |Parameters(input): Parameters<ReadInput>, cancel: CancellationToken| {
                 let files = Arc::clone(&read_files);
-                async move {
-                    let index = match files.index(cancel).await {
-                        Ok(index) => index,
-                        Err(error) => return error_answer(&error),
-                    };
-                    match tokio::task::spawn_blocking(move || read(&index, &input)).await {
-                        Ok(answer) => answer,
-                        Err(_) => error_answer(&Error::ReaderStopped),
-                    }
-                }
+                async move { answer(read_answer(&files, input, cancel).await) }
             },
         ))
         .with_route((
@@ -74,10 +65,12 @@ pub(super) fn router<S: Send + Sync + 'static>(settings: Settings) -> ToolRouter
             move |Parameters(input): Parameters<FindInput>, cancel: CancellationToken| {
                 let files = Arc::clone(&files);
                 async move {
-                    match files.index(cancel).await {
-                        Ok(index) => find(&index, &input),
-                        Err(error) => error_answer(&error),
-                    }
+                    let index = files.index(cancel).await;
+                    answer(
+                        index
+                            .map_err(|error| error.to_string())
+                            .and_then(|index| find(&index, &input)),
+                    )
                 }
             },
         ))
@@ -85,8 +78,14 @@ pub(super) fn router<S: Send + Sync + 'static>(settings: Settings) -> ToolRouter
 
 // region:    --- Support
 
-fn error_answer(error: &Error) -> CallToolResult {
-    CallToolResult::error(vec![ContentBlock::text(error.to_string())])
+/// Answers one `game_read` call. It reads the .pak file outside the server thread.
+async fn read_answer(files: &Files, input: ReadInput, cancel: CancellationToken) -> Answer {
+    let index = files
+        .index(cancel)
+        .await
+        .map_err(|error| error.to_string())?;
+    let read = tokio::task::spawn_blocking(move || read(&index, &input)).await;
+    read.map_err(|_| Error::ReaderStopped.to_string())?
 }
 
 /// The settings and the index, which the first call builds.

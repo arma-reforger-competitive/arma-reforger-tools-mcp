@@ -2,11 +2,11 @@
 
 use std::fmt::Write as _;
 
-use rmcp::model::{CallToolResult, ContentBlock};
 use schemars::JsonSchema;
 use serde::Deserialize;
 
 use super::index::{GameFile, Index};
+use crate::server::Answer;
 
 const DEFAULT_LIMIT: usize = 20;
 const MAX_LIMIT: usize = 100;
@@ -24,13 +24,13 @@ pub(super) struct FindInput {
 }
 
 /// Answers one `game_find` call.
-pub(super) fn find(index: &Index, input: &FindInput) -> CallToolResult {
+pub(super) fn find(index: &Index, input: &FindInput) -> Answer {
     let shown = input.query.trim();
     let query = shown.replace('\\', "/").to_lowercase();
     if query.is_empty() {
         let text = "The query is empty. Give a part of a file name or a class name, for example \
                     \"CharacterCameraHandler\" or \"SCR_PreGameGameModeStateComponent\".";
-        return CallToolResult::error(vec![ContentBlock::text(text)]);
+        return Err(text.to_owned());
     }
     // A class name such as SCR_CharacterCameraHandlerComponent is often in a file without the
     // SCR_ prefix, such as CharacterCameraHandlerComponent.c.
@@ -80,7 +80,7 @@ pub(super) fn find(index: &Index, input: &FindInput) -> CallToolResult {
     for note in &index.notes {
         let _ = write!(text, "\n{note}\n");
     }
-    CallToolResult::success(vec![ContentBlock::text(text.trim_end())])
+    Ok(text.trim_end().to_owned())
 }
 
 // region:    --- Support

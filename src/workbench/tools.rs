@@ -5,18 +5,18 @@ use std::sync::Arc;
 use rmcp::handler::server::{
     common::schema_for_type, router::tool::ToolRouter, wrapper::Parameters,
 };
-use rmcp::model::{CallToolResult, ContentBlock, Tool, ToolAnnotations};
+use rmcp::model::{Tool, ToolAnnotations};
 use schemars::JsonSchema;
 use serde::Deserialize;
 use serde_json::Map;
 
-use super::Error;
 use super::bridge::{Bridge, Setup};
 use super::install::HANDLER_FOLDER;
 use super::launch::{Launched, launch};
 #[cfg(test)]
 use super::settings::Settings;
-use crate::server::no_inputs;
+use super::{Error, Result};
+use crate::server::{Answer, answer, no_inputs};
 
 /// The input of `workbench_launch`.
 #[derive(Deserialize, JsonSchema)]
@@ -79,7 +79,7 @@ fn router_with<S: Send + Sync + 'static>(bridge: Bridge) -> ToolRouter<S> {
             workbench_launch,
             move |Parameters(input): Parameters<LaunchInput>| {
                 let bridge = Arc::clone(&launch_bridge);
-                async move { launch_answer(&bridge, input.wanted.as_deref()).await }
+                async move { answer(launch_answer(&bridge, input.wanted.as_deref()).await) }
             },
         ))
 }
@@ -96,20 +96,14 @@ fn labels() -> ToolAnnotations {
         .open_world(false)
 }
 
-/// A Tool answer: its text, and whether it is an error.
-struct Report {
-    text: String,
-    is_error: bool,
-}
-
 /// The answer of `workbench_status`. "Not running" and the three ways to a loaded Handler script
 /// are the states that this Tool reports, so they are normal answers, also when `NotRunning` is an
 /// error for the other Workbench Tools. Other failures are errors.
-async fn report(bridge: &Bridge) -> Report {
+async fn report(bridge: &Bridge) -> Result<String> {
     let setup = match bridge.call("ping", Map::new()).await {
         Ok((_, setup)) => setup,
-        Err(error @ Error::NotRunning { .. }) => return Report::normal(error.to_string()),
-        Err(error) => return Report::error(&error),
+        Err(error @ Error::NotRunning { .. }) => return Ok(error.to_string()),
+        Err(error) => return Err(error),
     };
     // The bridge answers only when the Handler script has the version of this server.
     let version = env!("CARGO_PKG_VERSION");
@@ -134,7 +128,7 @@ async fn report(bridge: &Bridge) -> Report {
         ),
         Err(error) => format!("The open mod project is not known: {error}"),
     };
-    Report::normal(format!(
+    Ok(format!(
         "Workbench is running, and {loaded}. {project} The Workbench Tools can use it now. Before \
          you pack or publish the mod, delete its folder {HANDLER_FOLDER}: Workbench packs the \
          Handler script with the mod."
@@ -142,31 +136,32 @@ async fn report(bridge: &Bridge) -> Report {
 }
 
 /// The answer of `workbench_launch`: what it started, then the state of Workbench.
-async fn launch_answer(bridge: &Bridge, wanted: Option<&str>) -> CallToolResult {
-    let started = match launch(bridge, wanted).await {
-        Ok(Launched::AlreadyRunning) => {
+async fn launch_answer(bridge: &Bridge, wanted: Option<&str>) -> Answer {
+    let launched = launch(bridge, wanted)
+        .await
+        .map_err(|error| error.to_string())?;
+    let started = match launched {
+        Launched::AlreadyRunning => {
             "Workbench was running already, so workbench_launch started nothing.".to_owned()
         }
-        Ok(Launched::Started { project, steam }) => format!(
+        Launched::Started { project, steam } => format!(
             "{}Workbench started with the mod {} and compiled the scripts.",
             steam_started(steam),
             project.id
         ),
-        Ok(Launched::StartedLauncher { steam }) => {
-            return answer(Report::normal(format!(
+        Launched::StartedLauncher { steam } => {
+            return Ok(format!(
                 "{}Workbench started on its launcher, because the project list of Workbench has \
                  no mod. Ask the user to create a mod there (Create New) or to add one (Add \
                  Existing). Then call workbench_status.",
                 steam_started(steam)
-            )));
+            ));
         }
-        Err(error) => return answer(Report::error(&error)),
     };
-    let report = report(bridge).await;
-    answer(Report {
-        text: format!("{started} {}", report.text),
-        is_error: report.is_error,
-    })
+    report(bridge)
+        .await
+        .map(|text| format!("{started} {text}"))
+        .map_err(|error| format!("{started} {error}"))
 }
 
 /// The start of the answer when `workbench_launch` started Steam.
@@ -175,31 +170,6 @@ fn steam_started(steam: bool) -> &'static str {
         "No user was logged in to Steam, so workbench_launch started Steam. "
     } else {
         ""
-    }
-}
-
-impl Report {
-    fn normal(text: String) -> Self {
-        Self {
-            text,
-            is_error: false,
-        }
-    }
-
-    fn error(error: &Error) -> Self {
-        Self {
-            text: error.to_string(),
-            is_error: true,
-        }
-    }
-}
-
-fn answer(report: Report) -> CallToolResult {
-    let content = vec![ContentBlock::text(report.text)];
-    if report.is_error {
-        CallToolResult::error(content)
-    } else {
-        CallToolResult::success(content)
     }
 }
 

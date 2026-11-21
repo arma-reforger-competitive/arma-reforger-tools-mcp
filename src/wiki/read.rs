@@ -2,12 +2,12 @@
 
 use std::collections::HashSet;
 
-use rmcp::model::{CallToolResult, ContentBlock};
 use schemars::JsonSchema;
 use serde::Deserialize;
 
 use super::pages::{Page, Pages, Source};
 use super::sections::Section;
+use crate::server::Answer;
 
 #[derive(Deserialize, JsonSchema)]
 pub(super) struct ReadInput {
@@ -21,7 +21,7 @@ pub(super) struct ReadInput {
 }
 
 /// Answers one `wiki_read` call.
-pub(super) fn read(pages: &Pages, input: &ReadInput) -> CallToolResult {
+pub(super) fn read(pages: &Pages, input: &ReadInput) -> Answer {
     let title = input.title.as_str();
     // Underscores count as spaces in a title, so "_" alone is empty too.
     if title
@@ -30,7 +30,7 @@ pub(super) fn read(pages: &Pages, input: &ReadInput) -> CallToolResult {
     {
         let text = "The title is empty. Give the title of a wiki page, \
                     for example \"Arma Reforger:Mod Project Setup\".";
-        return CallToolResult::error(vec![ContentBlock::text(text)]);
+        return Err(text.to_owned());
     }
     let Some(page) = pages.find(title) else {
         let suggestions = pages
@@ -42,18 +42,13 @@ pub(super) fn read(pages: &Pages, input: &ReadInput) -> CallToolResult {
         let text = format!(
             "No wiki page has the title \"{title}\". The closest titles are: {suggestions}."
         );
-        return CallToolResult::error(vec![ContentBlock::text(text)]);
+        return Err(text);
     };
     let wanted = input.section.as_deref().map_or("", str::trim);
     if wanted.is_empty() {
-        return CallToolResult::success(vec![ContentBlock::text(page_text(page))]);
+        return Ok(page_text(page));
     }
-    match find_sections(page, wanted) {
-        Ok(sections) => {
-            CallToolResult::success(vec![ContentBlock::text(section_text(page, &sections))])
-        }
-        Err(text) => CallToolResult::error(vec![ContentBlock::text(text)]),
-    }
+    find_sections(page, wanted).map(|sections| section_text(page, &sections))
 }
 
 // region:    --- Support

@@ -11,7 +11,7 @@ use super::Result;
 use super::pages::Pages;
 use super::read::{ReadInput, read};
 use super::search::{Index, SearchInput, search};
-use crate::server::read_only_labels;
+use crate::server::{answer, read_only_labels};
 
 /// Gives the wiki Tools to the server. It fails when a built-in page file is not valid.
 pub fn tools<S: Send + Sync + 'static>() -> Result<ToolRouter<S>> {
@@ -40,10 +40,12 @@ pub fn tools<S: Send + Sync + 'static>() -> Result<ToolRouter<S>> {
     Ok(ToolRouter::new()
         .with_route((
             wiki_read,
-            move |Parameters(input): Parameters<ReadInput>| read(&read_pages, &input),
+            move |Parameters(input): Parameters<ReadInput>| answer(read(&read_pages, &input)),
         ))
         .with_route((
             wiki_search,
-            move |Parameters(input): Parameters<SearchInput>| search(&pages, &index, &input),
+            move |Parameters(input): Parameters<SearchInput>| {
+                answer(search(&pages, &index, &input))
+            },
         )))
 }

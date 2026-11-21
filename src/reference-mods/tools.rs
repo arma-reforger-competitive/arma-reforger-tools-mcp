@@ -3,11 +3,11 @@
 use std::sync::Arc;
 
 use rmcp::handler::server::router::tool::ToolRouter;
-use rmcp::model::{CallToolResult, ContentBlock, Tool, ToolAnnotations};
+use rmcp::model::{Tool, ToolAnnotations};
 use tokio_util::sync::CancellationToken;
 
 use super::sync::{Settings, Wait, sync};
-use crate::server::no_inputs;
+use crate::server::{answer, no_inputs};
 use crate::workbench::Bridge;
 
 /// Gives the reference-mods Tool to the server, with the settings from the environment.
@@ -43,10 +43,7 @@ fn router_with<S: Send + Sync + 'static>(
         let state = Arc::clone(&state);
         async move {
             let (settings, bridge, wait) = state.as_ref();
-            match sync(settings, bridge, wait, cancel).await {
-                Ok(text) => CallToolResult::success(vec![ContentBlock::text(text)]),
-                Err(error) => CallToolResult::error(vec![ContentBlock::text(error.to_string())]),
-            }
+            answer(sync(settings, bridge, wait, cancel).await)
         }
     }))
 }

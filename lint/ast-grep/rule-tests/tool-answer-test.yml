@@ -1,0 +1,10 @@
+id: tool-answer
+valid:
+  - "fn call() -> CallToolResult { answer(generate()) }"
+  - "fn call() -> Answer { Err(text) }"
+  - "fn check(result: &CallToolResult) -> bool { result.is_error == Some(true) }"
+invalid:
+  - "fn call() -> CallToolResult { CallToolResult::error(vec![ContentBlock::text(text)]) }"
+  - "fn call() -> CallToolResult { rmcp::model::CallToolResult::error(content) }"
+  - "fn call() -> CallToolResult { CallToolResult::structured_error(value) }"
+  - "fn call(mut result: CallToolResult) -> CallToolResult { result.is_error = Some(true); result }"
