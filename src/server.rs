@@ -30,7 +30,8 @@ signatures and parent classes.
 directly.
 - `game_find`: the scripts, Prefabs, and configs of the game and of the Workshop mods that \
 Workbench downloaded. They are inside .pak archives, so grep, find, and file search cannot see \
-them, and they are not in the project folder.
+them, and they are not in the project folder. When the user asks for the script of a class, \
+call `game_find` directly with the class name as `query`.
 - `game_read`: open one file of the game or of a downloaded mod by its `path`, and get its full \
 text. When the user gives the path of a file of the game or of a Workshop mod, call `game_read` \
 directly with that path, not Read or find.
@@ -38,7 +39,9 @@ directly with that path, not Read or find.
 the Handler script of this plugin is loaded, and which mod is open. For how to do something in \
 Workbench, use the wiki Tools.
 - `workbench_launch`: start Workbench with the user's mod named in `mod`, and wait until it is \
-ready. When Workbench runs already, it starts nothing and names the open mod.
+ready. When Workbench runs already, it starts nothing and names the open mod. It finds the \
+user's mods itself, so call it directly, also when the user names no mod, and do not look for a \
+.gproj file first.
 - `reference_sync`: get, update, or clean up the Reference mods: the Workshop mods that the \
 user's mod repos list for study. It downloads the missing ones and deletes the dropped ones. It \
 finds and reads the lists itself, and they are not in the project folder, so call it directly, \
