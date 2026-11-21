@@ -46,20 +46,20 @@ REFORGER_MODS_PATH=/tmp/ref-test node .claude/skills/workbench-test/tool.ts refe
 
 ## Raw NET API calls
 
-`net-api.ts` in this folder sends one call to the Workbench NET API and prints the status and the JSON answer. It uses the same settings and the same bytes as the bridge (`src/workbench/wire.rs`). No Tool does this, because a call to any function is too open for users.
+`cargo xtask net-api` sends one call to the Workbench NET API and prints the status and the JSON answer. It uses the same settings and the same bytes as the bridge: it builds `src/workbench/wire.rs` and `src/wsl.rs` of the server. It exits with 1 when the status is not `Ok`. No Tool does this, because a call to any function is too open for users.
 
 ```sh
-node .claude/skills/workbench-test/net-api.ts IsWorkbenchRunning
-node .claude/skills/workbench-test/net-api.ts GetLoadedProjects
-node .claude/skills/workbench-test/net-api.ts ReforgerBridge '{"action":"ping"}'
-node .claude/skills/workbench-test/net-api.ts ReloadScripts
+cargo xtask net-api IsWorkbenchRunning
+cargo xtask net-api GetLoadedProjects
+cargo xtask net-api ReforgerBridge '{"action":"ping"}'
+cargo xtask net-api ReloadScripts
 ```
 
 `ReloadScripts` answers when the compile ends. Workbench does not load a new script file without it.
 
 ## Facts
 
-- Under WSL, Workbench is on the Windows host: the gateway of the default route, for example `172.17.240.1`. The script finds it by itself.
+- Under WSL, Workbench is on the Windows host: the gateway of the default route, for example `172.17.240.1`. `cargo xtask net-api` finds it by itself.
 - A closed port times out after 3 seconds. Windows does not refuse the connection.
 - The project list of Workbench is `profile/.projectList_*.conf` in `C:\Users\<you>\Documents\My Games\ArmaReforgerWorkbench`. It names the `.gproj` file of each mod.
 - The Workbench log is in `logs/` of the same folder. When a mod does not load, the log names the reason, for example a missing dependency.

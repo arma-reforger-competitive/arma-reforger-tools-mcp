@@ -4,7 +4,8 @@
 
 use std::path::PathBuf;
 
-use crate::host_path::{host_path, is_wsl};
+use crate::host_path::host_path;
+use crate::wsl::is_wsl;
 
 /// The setting of the Workbench folder in Documents.
 pub const DOCUMENTS_SETTING: &str = "REFORGER_WORKBENCH_DOCUMENTS_PATH";

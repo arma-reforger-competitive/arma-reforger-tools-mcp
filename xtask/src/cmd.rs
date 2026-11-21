@@ -18,6 +18,9 @@ pub enum SubCmd {
     /// Ask Claude every Tool-choice test in tests/tool-choice/cases.jsonl and check its first call.
     /// Needs a Claude Code login, and costs model use.
     ToolChoice(ToolChoiceArgs),
+    /// Send one call to the Workbench NET API, and print the status and the JSON answer.
+    /// Reads `REFORGER_WORKBENCH_HOST` and `REFORGER_WORKBENCH_PORT`, the same as the Workbench bridge.
+    NetApi(NetApiArgs),
 }
 
 #[derive(Args, Debug)]
@@ -39,4 +42,12 @@ pub struct ToolChoiceArgs {
     /// of a new or changed Tool; run every test before the merge.
     #[arg(long)]
     pub tool: Option<String>,
+}
+
+#[derive(Args, Debug)]
+pub struct NetApiArgs {
+    /// The NET API function (`APIFunc`), for example `IsWorkbenchRunning` or `ReforgerBridge`.
+    pub function: String,
+    /// The parameters as one JSON object, for example '{"action":"ping"}'. Default: {}.
+    pub params: Option<String>,
 }

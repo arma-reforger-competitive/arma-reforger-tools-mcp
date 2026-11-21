@@ -16,6 +16,7 @@ mod server;
 mod wiki;
 mod workbench;
 mod workbench_documents;
+mod wsl;
 
 #[cfg(test)]
 mod test_support;

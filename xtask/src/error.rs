@@ -4,7 +4,7 @@ use std::fmt;
 use std::path::PathBuf;
 use std::process::ExitStatus;
 
-use crate::wikitext;
+use crate::{net_api, wikitext};
 
 pub type Result<T> = core::result::Result<T, Error>;
 
@@ -75,6 +75,7 @@ pub enum Error {
     },
 
     // -- Modules
+    NetApi(net_api::Error),
     Wikitext {
         title: String,
         source: wikitext::Error,
@@ -154,6 +155,7 @@ impl fmt::Display for Error {
             ),
             Self::Read { path, source } => write!(f, "Cannot read {}: {source}", path.display()),
             Self::Write { path, source } => write!(f, "Cannot write {}: {source}", path.display()),
+            Self::NetApi(err) => write!(f, "{err}"),
             Self::Wikitext { title, source } => write!(f, "Page \"{title}\": {source}"),
             Self::Xml { path, source } => {
                 write!(f, "{} is not valid XML: {source}", path.display())
@@ -174,6 +176,7 @@ impl std::error::Error for Error {
             | Self::CiStepNotStarted { source, .. }
             | Self::ClaudeNotStarted { source } => Some(source),
             Self::BadCase { source, .. } => Some(source),
+            Self::NetApi(err) => Some(err),
             Self::Wikitext { source, .. } => Some(source),
             Self::Xml { source, .. } => Some(source),
             Self::XmlEntity { source, .. } => Some(source),
@@ -192,6 +195,12 @@ impl std::error::Error for Error {
 }
 
 // region:    --- Froms
+
+impl From<net_api::Error> for Error {
+    fn from(err: net_api::Error) -> Self {
+        Self::NetApi(err)
+    }
+}
 
 impl From<serde_json::Error> for Error {
     fn from(err: serde_json::Error) -> Self {

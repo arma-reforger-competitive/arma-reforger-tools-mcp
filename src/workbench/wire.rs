@@ -4,8 +4,10 @@
 //! the client ID, the content type `JsonRPC`, and the JSON payload. An answer is two Pascal
 //! strings: the status (`Ok` or an error text) and the JSON payload. A Pascal string is a 4-byte
 //! little-endian length and then that many UTF-8 bytes.
+//!
+//! This file uses only `std`, because `cargo xtask net-api` builds it too.
 
-use super::error::Garbled;
+use std::fmt;
 
 /// The only protocol version that Workbench knows.
 const PROTOCOL_VERSION: i32 = 1;
@@ -16,7 +18,7 @@ const CLIENT_ID: &str = "reforger";
 /// The only content type that Workbench knows.
 const CONTENT_TYPE: &str = "JsonRPC";
 
-/// The longest answer that the bridge reads. A longer one is not a NET API answer.
+/// The longest answer that a client reads. A longer one is not a NET API answer.
 pub(super) const MAX_ANSWER_BYTES: usize = 16 * 1024 * 1024;
 
 /// The bytes of one request with the JSON `payload`.
@@ -29,7 +31,7 @@ pub(super) fn request(payload: &str) -> Vec<u8> {
 }
 
 /// The status and the payload of a whole answer.
-pub(super) fn answer(bytes: &[u8]) -> Result<(String, String), Garbled> {
+pub(super) fn answer(bytes: &[u8]) -> Result<(String, String), BadBytes> {
     let (status, rest) = read_string(bytes)?;
     // An error status can come with no payload.
     if rest.is_empty() {
@@ -37,7 +39,7 @@ pub(super) fn answer(bytes: &[u8]) -> Result<(String, String), Garbled> {
     }
     let (payload, rest) = read_string(rest)?;
     if !rest.is_empty() {
-        return Err(Garbled::ExtraBytes { count: rest.len() });
+        return Err(BadBytes::ExtraBytes { count: rest.len() });
     }
     Ok((status, payload))
 }
@@ -49,14 +51,35 @@ pub(super) fn push_string(bytes: &mut Vec<u8>, text: &str) {
     bytes.extend_from_slice(text.as_bytes());
 }
 
+/// Why the bytes of an answer are not a whole answer.
+#[derive(Debug)]
+pub enum BadBytes {
+    /// The answer ends in the middle of a string, or is empty.
+    Ends,
+    ExtraBytes {
+        count: usize,
+    },
+    NotUtf8,
+}
+
+impl fmt::Display for BadBytes {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Ends => write!(f, "it ends in the middle of a string"),
+            Self::ExtraBytes { count } => write!(f, "it has {count} bytes after the payload"),
+            Self::NotUtf8 => write!(f, "a string in it is not UTF-8"),
+        }
+    }
+}
+
 // region:    --- Support
 
 /// Reads one Pascal string from the start of `bytes` and returns it with the bytes after it.
-fn read_string(bytes: &[u8]) -> Result<(String, &[u8]), Garbled> {
-    let (len, rest) = bytes.split_first_chunk::<4>().ok_or(Garbled::Ends)?;
-    let len = usize::try_from(u32::from_le_bytes(*len)).map_err(|_| Garbled::Ends)?;
-    let (text, rest) = rest.split_at_checked(len).ok_or(Garbled::Ends)?;
-    let text = String::from_utf8(text.to_vec()).map_err(|_| Garbled::NotUtf8)?;
+fn read_string(bytes: &[u8]) -> Result<(String, &[u8]), BadBytes> {
+    let (len, rest) = bytes.split_first_chunk::<4>().ok_or(BadBytes::Ends)?;
+    let len = usize::try_from(u32::from_le_bytes(*len)).map_err(|_| BadBytes::Ends)?;
+    let (text, rest) = rest.split_at_checked(len).ok_or(BadBytes::Ends)?;
+    let text = String::from_utf8(text.to_vec()).map_err(|_| BadBytes::NotUtf8)?;
     Ok((text, rest))
 }
 
@@ -85,6 +108,29 @@ mod tests {
     }
 
     #[test]
+    fn counts_the_length_of_a_string_in_bytes_not_in_chars() {
+        // -- Exec
+        let bytes = request("é");
+
+        // -- Check
+        // "é" is 2 bytes in UTF-8.
+        assert_eq!(
+            bytes.get(bytes.len() - 6..),
+            Some(&[2, 0, 0, 0, 0xc3, 0xa9][..])
+        );
+    }
+
+    #[test]
+    fn reads_an_error_status_with_no_payload_as_a_whole_answer() {
+        // -- Exec
+        let (status, payload) = answer(b"\x12\x00\x00\x00Undefined API func").unwrap();
+
+        // -- Check
+        assert_eq!(status, "Undefined API func");
+        assert_eq!(payload, "");
+    }
+
+    #[test]
     fn reads_the_answer_that_workbench_gave_to_get_loaded_projects() {
         // -- Setup & Fixtures
         // The bytes that Workbench 1.6 sent to GetLoadedProjects with the BridgeTest mod open.
@@ -110,7 +156,7 @@ mod tests {
             b"\x09\x00\x00\x00Ok",
             b"\x02\x00\x00\x00Ok\x05\x00",
         ] {
-            assert!(matches!(answer(bytes), Err(Garbled::Ends)), "{bytes:?}");
+            assert!(matches!(answer(bytes), Err(BadBytes::Ends)), "{bytes:?}");
         }
     }
 
@@ -119,7 +165,7 @@ mod tests {
         // -- Exec & Check
         assert!(matches!(
             answer(b"\x02\x00\x00\x00Ok\x02\x00\x00\x00{}xyz"),
-            Err(Garbled::ExtraBytes { count: 3 })
+            Err(BadBytes::ExtraBytes { count: 3 })
         ));
     }
 }
