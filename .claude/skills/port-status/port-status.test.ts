@@ -3,18 +3,15 @@ import { existsSync, mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
 import { homedir, tmpdir } from "node:os";
 import { join } from "node:path";
 import { test } from "node:test";
+import { type Feature, inventory, readUsage, type Usage } from "./old-project.ts";
 import {
   checkPorted,
-  type Feature,
-  inventory,
   linkTo,
   parseLedger,
-  readUsage,
   renderLedger,
   type Row,
   setStatus,
   sync,
-  type Usage,
   verdict,
 } from "./port-status.ts";
 
