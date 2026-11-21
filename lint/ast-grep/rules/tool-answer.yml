@@ -1,0 +1,22 @@
+id: tool-answer
+language: rust
+severity: error
+message: An error answer of a Tool is built without crate::server::answer
+note: |
+  Use `crate::server::answer(result)`. It turns the result of a Tool into the answer: `Ok` gives a
+  normal answer, and `Err` gives an error answer with the Display text of the error. Return a case
+  of the Capability's Error enum, or a `crate::server::Answer` when the error is a hint for a wrong
+  input. Only src/server.rs builds an error answer or sets the error flag of an answer.
+rule:
+  any:
+    - kind: call_expression
+      has:
+        field: function
+        regex: CallToolResult\s*::\s*(error|structured_error)$
+    - kind: assignment_expression
+      has:
+        field: left
+        kind: field_expression
+        regex: \.\s*is_error$
+ignores:
+  - src/server.rs

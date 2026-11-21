@@ -7,12 +7,12 @@
 use std::fmt::Write as _;
 use std::path::Path;
 
-use rmcp::model::{CallToolResult, ContentBlock};
 use schemars::JsonSchema;
 use serde::Deserialize;
 
 use super::Error;
 use super::index::{GameFile, Index};
+use crate::server::Answer;
 
 /// How many real paths a wrong path suggests.
 const SUGGESTIONS: usize = 5;
@@ -37,11 +37,8 @@ pub(super) struct ReadInput {
 }
 
 /// Answers one `game_read` call. It reads the .pak file, so it runs outside the server thread.
-pub(super) fn read(index: &Index, input: &ReadInput) -> CallToolResult {
-    let found = match lookup(index, input) {
-        Ok(found) => found,
-        Err(answer) => return answer,
-    };
+pub(super) fn read(index: &Index, input: &ReadInput) -> Answer {
+    let found = lookup(index, input)?;
     let file = found.file;
     match file.read() {
         Ok(content) => answer(index, &found, &content),
@@ -53,12 +50,13 @@ pub(super) fn read(index: &Index, input: &ReadInput) -> CallToolResult {
                      mod again."
                 }
             };
-            error(&format!(
+            let text = format!(
                 "Could not open {} ({}) from {}: {read_error}.{advice}",
                 file.path,
                 index.source_of(file),
                 file.pak.display()
-            ))
+            );
+            Err(text)
         }
     }
 }
@@ -76,14 +74,16 @@ struct Found<'a> {
     other_paks: Vec<&'a Path>,
 }
 
-/// The file that `input` names in `index`. When it finds none, the answer says why.
-fn lookup<'a>(index: &'a Index, input: &ReadInput) -> Result<Found<'a>, CallToolResult> {
+/// The file that `input` names in `index`. When it finds none, the hint says why.
+// Reason: the hint for a wrong path from Claude (docs/agents/rust.md, Errors).
+// ast-grep-ignore: string-error
+fn lookup<'a>(index: &'a Index, input: &ReadInput) -> Result<Found<'a>, String> {
     let (path, source_in_path) = clean_path(&input.path);
     let path = path.as_str();
     if path.is_empty() {
         let text = "The path is empty. Give the path of a Game file, for example \
                     \"scripts/Game/Weapon/SCR_WeaponInfo.c\". To find a path, call game_find.";
-        return Err(error(text));
+        return Err(text.to_owned());
     }
     let mut matches: Vec<&GameFile> = index
         .files
@@ -91,7 +91,7 @@ fn lookup<'a>(index: &'a Index, input: &ReadInput) -> Result<Found<'a>, CallTool
         .filter(|file| file.path.eq_ignore_ascii_case(path))
         .collect();
     if matches.is_empty() {
-        return Err(error(&not_found(index, path)));
+        return Err(not_found(index, path));
     }
     // The game comes first, then the mods. The path with the same capital letters comes first.
     matches.sort_by_key(|file| (file.source, file.path != path));
@@ -115,7 +115,7 @@ fn lookup<'a>(index: &'a Index, input: &ReadInput) -> Result<Found<'a>, CallTool
              leave source out to open the first.",
             wanted.unwrap_or_default()
         );
-        return Err(error(&text));
+        return Err(text);
     };
     let (same_source, others): (Vec<&GameFile>, Vec<&GameFile>) = matches
         .into_iter()
@@ -132,7 +132,7 @@ fn lookup<'a>(index: &'a Index, input: &ReadInput) -> Result<Found<'a>, CallTool
 }
 
 /// The answer with the text of the found file, which has `content`.
-fn answer(index: &Index, found: &Found, content: &[u8]) -> CallToolResult {
+fn answer(index: &Index, found: &Found, content: &[u8]) -> Answer {
     let file = found.file;
     let check = content.get(..BINARY_CHECK_BYTES).unwrap_or(content);
     if check.contains(&0) {
@@ -143,7 +143,7 @@ fn answer(index: &Index, found: &Found, content: &[u8]) -> CallToolResult {
             index.source_of(file),
             content.len()
         );
-        return error(&text);
+        return Err(text);
     }
     let text = String::from_utf8_lossy(content);
     let text = text.strip_prefix('\u{feff}').unwrap_or(&text);
@@ -175,11 +175,7 @@ fn answer(index: &Index, found: &Found, content: &[u8]) -> CallToolResult {
         );
     }
     let _ = write!(answer, "\n{text}");
-    CallToolResult::success(vec![ContentBlock::text(answer)])
-}
-
-fn error(text: &str) -> CallToolResult {
-    CallToolResult::error(vec![ContentBlock::text(text)])
+    Ok(answer)
 }
 
 /// The path without the parts that Claude often copies with it: the `(game)` or `(mod tvtLobby)`

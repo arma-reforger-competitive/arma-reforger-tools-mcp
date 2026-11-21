@@ -2,11 +2,11 @@
 
 use std::fmt::Write as _;
 
-use rmcp::model::{CallToolResult, ContentBlock};
 use schemars::JsonSchema;
 use serde::Deserialize;
 
 use super::classes::{Class, Classes};
+use crate::server::Answer;
 
 const DEFAULT_LIMIT: usize = 10;
 const MAX_LIMIT: usize = 50;
@@ -42,7 +42,7 @@ pub(super) struct Index {
 }
 
 /// Answers one `api_search` call.
-pub(super) fn search(classes: &Classes, index: &Index, input: &SearchInput) -> CallToolResult {
+pub(super) fn search(classes: &Classes, index: &Index, input: &SearchInput) -> Answer {
     let names: Vec<String> = input
         .query
         .split_whitespace()
@@ -51,7 +51,7 @@ pub(super) fn search(classes: &Classes, index: &Index, input: &SearchInput) -> C
     if names.is_empty() {
         let text = "The query is empty. Give the name or a part of the name of a class or a method, \
                     for example \"SCR_BaseGameMode\" or \"GetFocusFOVScale\".";
-        return CallToolResult::error(vec![ContentBlock::text(text)]);
+        return Err(text.to_owned());
     }
     let limit = input.limit.unwrap_or(DEFAULT_LIMIT).clamp(1, MAX_LIMIT);
     let entries = index
@@ -113,7 +113,7 @@ pub(super) fn search(classes: &Classes, index: &Index, input: &SearchInput) -> C
              for example \"Camera\" for \"CharacterCameraBase\". To search the wiki by words, use \
              wiki_search."
         );
-        return CallToolResult::success(vec![ContentBlock::text(text)]);
+        return Ok(text);
     }
     if !hits.is_empty() {
         let intro = if found_names {
@@ -130,7 +130,7 @@ pub(super) fn search(classes: &Classes, index: &Index, input: &SearchInput) -> C
     for (number, hit) in hits.iter().take(limit).enumerate() {
         let _ = write!(text, "\n{}. {}", number + 1, hit.entry.line(classes));
     }
-    CallToolResult::success(vec![ContentBlock::text(text)])
+    Ok(text)
 }
 
 impl Index {

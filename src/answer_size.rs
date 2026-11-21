@@ -152,7 +152,7 @@ mod tests {
     #[test]
     fn keeps_the_error_flag_of_a_cut_answer() {
         // -- Setup & Fixtures
-        let answer = CallToolResult::error(vec![ContentBlock::text("a".repeat(100_001))]);
+        let answer = crate::server::answer(Err::<String, _>("a".repeat(100_001)));
 
         // -- Exec
         let cut_answer = cut(answer);

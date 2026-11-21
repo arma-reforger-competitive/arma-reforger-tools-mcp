@@ -3,12 +3,12 @@
 use std::collections::{HashMap, HashSet};
 use std::fmt::Write as _;
 
-use rmcp::model::{CallToolResult, ContentBlock};
 use schemars::JsonSchema;
 use serde::Deserialize;
 
 use super::pages::{Page, Pages};
 use super::sections::Section;
+use crate::server::Answer;
 
 /// BM25 settings: how fast more uses of a word stop adding to the score, and how much a long text is
 /// pushed down. These are the usual values.
@@ -43,13 +43,13 @@ pub(super) struct Index {
 }
 
 /// Answers one `wiki_search` call.
-pub(super) fn search(pages: &Pages, index: &Index, input: &SearchInput) -> CallToolResult {
+pub(super) fn search(pages: &Pages, index: &Index, input: &SearchInput) -> Answer {
     let query = input.query.trim();
     let query_words: HashSet<String> = words(query).into_iter().collect();
     if query_words.is_empty() {
         let text =
             "The query has no words. Give words to search for, for example \"server config\".";
-        return CallToolResult::error(vec![ContentBlock::text(text)]);
+        return Err(text.to_owned());
     }
     let limit = input.limit.unwrap_or(DEFAULT_LIMIT).clamp(1, MAX_LIMIT);
     let hits = index.search(&query_words, limit);
@@ -58,7 +58,7 @@ pub(super) fn search(pages: &Pages, index: &Index, input: &SearchInput) -> CallT
             "No wiki page matches \"{query}\". Try fewer words, another word for the same thing, \
              or the name of a class or a setting, for example \"replication\" or \"fastValidation\"."
         );
-        return CallToolResult::success(vec![ContentBlock::text(text)]);
+        return Ok(text);
     }
     let mut text = format!(
         "{} pages match \"{query}\". Read one with wiki_read: give its title, and give `section` \
@@ -86,7 +86,7 @@ pub(super) fn search(pages: &Pages, index: &Index, input: &SearchInput) -> CallT
             snippet(page, section, &query_words)
         );
     }
-    CallToolResult::success(vec![ContentBlock::text(text)])
+    Ok(text)
 }
 
 impl Index {

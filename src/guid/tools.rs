@@ -1,10 +1,10 @@
 //! The Tool of the guid Capability.
 
 use rmcp::handler::server::router::tool::ToolRouter;
-use rmcp::model::{CallToolResult, ContentBlock, Tool, ToolAnnotations};
+use rmcp::model::{Tool, ToolAnnotations};
 
 use super::{Error, Result};
-use crate::server::no_inputs;
+use crate::server::{answer, no_inputs};
 
 /// Gives the guid Tool to the server.
 pub fn tools<S: Send + Sync + 'static>() -> ToolRouter<S> {
@@ -20,12 +20,7 @@ pub fn tools<S: Send + Sync + 'static>() -> ToolRouter<S> {
     )
     .with_title("Make a mod GUID")
     .annotate(labels());
-    ToolRouter::new().with_route((guid_generate, || async {
-        match generate() {
-            Ok(guid) => CallToolResult::success(vec![ContentBlock::text(guid)]),
-            Err(error) => CallToolResult::error(vec![ContentBlock::text(error.to_string())]),
-        }
-    }))
+    ToolRouter::new().with_route((guid_generate, || async { answer(generate()) }))
 }
 
 /// Makes a GUID from 8 random bytes of the operating system, written as 16 hex characters in

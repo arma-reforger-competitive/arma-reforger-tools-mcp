@@ -1,13 +1,14 @@
 //! The MCP server: one Tool router with the Tools of every Capability.
 
+use std::fmt::Display;
 use std::sync::Arc;
 
 use rmcp::{
     ErrorData, RoleServer, ServerHandler, ServiceExt,
     handler::server::{router::tool::ToolRouter, tool::ToolCallContext},
     model::{
-        CallToolRequestParams, CallToolResponse, Implementation, JsonObject, ServerCapabilities,
-        ServerConfig, ToolAnnotations,
+        CallToolRequestParams, CallToolResponse, CallToolResult, ContentBlock, Implementation,
+        JsonObject, ServerCapabilities, ServerConfig, ToolAnnotations,
     },
     service::RequestContext,
     tool_handler,
@@ -105,6 +106,21 @@ pub async fn run() -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 
+/// The text of a Tool answer, or the hint of an error answer for a wrong input from Claude.
+// Reason: a hint is a text for Claude, not a Rust error (docs/agents/rust.md, Errors).
+// ast-grep-ignore: string-error
+pub type Answer = Result<String, String>;
+
+/// Turns the result of a Tool into its answer. `Ok` gives a normal answer with the text. `Err`
+/// gives an error answer with the `Display` text of the error, which is the hint for Claude.
+/// Every Tool answer comes from here, and the `tool-answer` check of ast-grep stops other ways.
+pub fn answer<T: Into<String>, E: Display>(result: Result<T, E>) -> CallToolResult {
+    match result {
+        Ok(text) => CallToolResult::success(vec![ContentBlock::text(text)]),
+        Err(error) => CallToolResult::error(vec![ContentBlock::text(error.to_string())]),
+    }
+}
+
 /// The input schema of a Tool with no inputs. MCP needs `"type": "object"`, and a client drops a
 /// Tool whose schema does not have it.
 pub fn no_inputs() -> Arc<JsonObject> {
@@ -141,7 +157,7 @@ fn cut_answer(response: CallToolResponse) -> CallToolResponse {
 mod tests {
     use std::time::Duration;
 
-    use rmcp::model::{CallToolRequest, CallToolResult, ClientRequest, Tool};
+    use rmcp::model::{CallToolRequest, ClientRequest, Tool};
     use rmcp::service::PeerRequestOptions;
     use serde_json::Map;
     use tokio::sync::Notify;
