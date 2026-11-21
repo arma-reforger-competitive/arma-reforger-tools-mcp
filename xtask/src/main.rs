@@ -2,6 +2,7 @@
 
 // region:    --- Modules
 
+mod call_tool;
 mod ci;
 mod cmd;
 mod doxygen;
@@ -36,6 +37,7 @@ fn main() -> ExitCode {
         SubCmd::Import(ImportArgs { export_list: false }) => import::run(),
         SubCmd::ToolChoice(args) => tool_choice::run(&args),
         SubCmd::NetApi(args) => net_api::run(&args).map_err(Error::from),
+        SubCmd::CallTool(args) => call_tool::run(&args).map_err(Error::from),
     };
     match result {
         Ok(()) => ExitCode::SUCCESS,

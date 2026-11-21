@@ -21,6 +21,10 @@ pub enum SubCmd {
     /// Send one call to the Workbench NET API, and print the status and the JSON answer.
     /// Reads `REFORGER_WORKBENCH_HOST` and `REFORGER_WORKBENCH_PORT`, the same as the Workbench bridge.
     NetApi(NetApiArgs),
+    /// Call one Tool of target/release/reforger, and print only the text of the answer.
+    /// Passes the `REFORGER_*` settings of ~/.claude/settings.json; a shell variable wins.
+    /// Exits with 1 when the answer is an error. Run `cargo build --release` first.
+    CallTool(CallToolArgs),
 }
 
 #[derive(Args, Debug)]
@@ -50,4 +54,12 @@ pub struct NetApiArgs {
     pub function: String,
     /// The parameters as one JSON object, for example '{"action":"ping"}'. Default: {}.
     pub params: Option<String>,
+}
+
+#[derive(Args, Debug)]
+pub struct CallToolArgs {
+    /// The Tool, for example `game_find`.
+    pub tool: String,
+    /// The inputs of the Tool, each as name=value, for example query=S3C.
+    pub inputs: Vec<String>,
 }

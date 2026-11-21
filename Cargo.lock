@@ -1820,9 +1820,11 @@ dependencies = [
  "clap",
  "html-escape",
  "quick-xml",
+ "rmcp",
  "scraper",
  "serde",
  "serde_json",
+ "tokio",
 ]
 
 [[package]]
