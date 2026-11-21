@@ -36,4 +36,4 @@ Read `docs/agents/rust.md` before you change Rust code, and `docs/agents/mcp.md`
 
 Commit messages follow Conventional Commits with this project's types and scopes. Read `docs/agents/commits.md` before every commit.
 
-The git hooks are in `.githooks/`. After a clone, turn them on: `git config core.hooksPath .githooks`. The pre-commit hook runs `cargo fmt --check` and `cargo check --workspace` on the staged files, so every commit is formatted and builds. The commit-msg hook checks the message.
+The git hooks are in `.githooks/`. After a clone, turn them on: `git config core.hooksPath .githooks`. The pre-commit hook runs `node ~/www/home/tools/home.ts check-size`, which stops a staged file over 20,000 bytes and says how to split it. Then it runs `cargo fmt --check` and `cargo check --workspace` on the staged files, so every commit is formatted and builds. `.gitattributes` marks the Knowledge base `linguist-generated`, so check-size skips it. The commit-msg hook checks the message.
