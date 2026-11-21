@@ -1,7 +1,9 @@
 #!/bin/sh
-# Checks that the commit is formatted and builds. Cargo checks a copy of the staged files, not the files on disk:
+# Checks that no staged file is too big for an agent to read (check-size), and that the commit is
+# formatted and builds. Cargo checks a copy of the staged files, not the files on disk:
 # a new file that is on disk but not staged must not hide a commit that does not compile.
 set -e
+node "$HOME/www/home/tools/home.ts" check-size
 root=$(git rev-parse --show-toplevel)
 copy="$root/target/pre-commit/src"
 rm -rf "$copy"
