@@ -161,6 +161,45 @@ async fn has_a_row_for_every_served_tool_in_the_readme_tools_table() {
 }
 
 #[tokio::test]
+async fn names_only_served_tools_in_the_plugin_skills() {
+    // -- Setup & Fixtures
+    let client = start().await;
+    let served: Vec<String> = client
+        .list_all_tools()
+        .await
+        .unwrap()
+        .into_iter()
+        .map(|tool| tool.name.into_owned())
+        .collect();
+    let skills = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("skills");
+
+    // -- Exec & Check
+    // A Tool name is a word in backticks of lower-case letters and `_`, with a letter first, for
+    // example `guid_generate`. Each one in a skill must be a Tool that the server serves.
+    for entry in std::fs::read_dir(&skills).expect("the repo has a skills folder") {
+        let file = entry.unwrap().path().join("SKILL.md");
+        let text = std::fs::read_to_string(&file)
+            .unwrap_or_else(|error| panic!("cannot read {}: {error}", file.display()));
+        for (index, word) in text.split('`').enumerate() {
+            let in_backticks = index % 2 == 1;
+            let looks_like_a_tool = word.contains('_')
+                && word.starts_with(|c: char| c.is_ascii_lowercase())
+                && word.chars().all(|c| c.is_ascii_lowercase() || c == '_');
+            if in_backticks && looks_like_a_tool {
+                assert!(
+                    served.iter().any(|tool| tool == word),
+                    "{} names the Tool `{word}`, but the server does not serve it: use the \
+                     name of a served Tool, or add the Tool to the server",
+                    file.display()
+                );
+            }
+        }
+    }
+
+    client.cancel().await.unwrap();
+}
+
+#[tokio::test]
 async fn gives_every_tool_a_title_and_all_four_tool_labels() {
     // -- Setup & Fixtures
     let client = start().await;
